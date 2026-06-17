@@ -42,6 +42,11 @@ cd "$ROOT/MuseTalk"
 sed -i 's#https://hf-mirror.com#https://huggingface.co#g' download_weights.sh || true
 "$MAMBA" run -n "$ENV" bash download_weights.sh
 
+# download_weights.sh runs `pip install -U huggingface_hub[cli]`, which upgrades it
+# to >=1.0 and breaks transformers 4.39.2 (needs <1.0). Pin it back.
+echo "[envMT] pinning huggingface_hub back to 0.30.2 (download_weights.sh bumped it)…"
+"$MAMBA" run -n "$ENV" pip install --no-cache-dir "huggingface_hub==0.30.2"
+
 echo "[envMT] verifying mmcv + musetalk weights…"
 "$MAMBA" run -n "$ENV" python -c "import torch, mmcv; print('torch', torch.__version__, 'mmcv', mmcv.__version__)"
 test -f "$ROOT/MuseTalk/models/musetalkV15/unet.pth" && echo "musetalk v15 weights OK"
