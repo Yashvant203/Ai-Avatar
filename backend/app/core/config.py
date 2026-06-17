@@ -46,8 +46,8 @@ class Settings(BaseSettings):
         "video/quicktime",
         "video/webm",
     ]
-    MIN_VIDEO_SECONDS: float = 120.0  # 2 min
-    MAX_VIDEO_SECONDS: float = 300.0  # 5 min
+    MIN_VIDEO_SECONDS: float = 10.0  # short self-recorded clips are fine (driving-based)
+    MAX_VIDEO_SECONDS: float = 600.0  # 10 min
     # Pipeline ML backend: "auto" uses the real models if importable, else a
     # deterministic stub (ffmpeg + stdlib) so the pipeline runs without a GPU.
     PIPELINE_BACKEND: str = "auto"  # auto | real | stub
