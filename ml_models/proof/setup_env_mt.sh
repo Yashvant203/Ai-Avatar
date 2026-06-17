@@ -31,6 +31,10 @@ echo "[envMT] installing MMLab stack via mim (mmengine → mmcv → mmdet → mm
 "$MAMBA" run -n "$ENV" mim install mmengine
 "$MAMBA" run -n "$ENV" mim install "mmcv==2.0.1"
 "$MAMBA" run -n "$ENV" mim install "mmdet==3.1.0"
+# mmpose pulls chumpy, whose setup.py imports numpy at build time and therefore
+# fails under pip's build isolation. Build it first against the env's numpy (1.23.5).
+"$MAMBA" run -n "$ENV" pip install --no-cache-dir --no-build-isolation chumpy \
+  || "$MAMBA" run -n "$ENV" pip install --no-cache-dir "chumpy@git+https://github.com/mattloper/chumpy.git"
 "$MAMBA" run -n "$ENV" mim install "mmpose==1.1.0"
 
 echo "[envMT] downloading MuseTalk weights (force public HF endpoint)…"
