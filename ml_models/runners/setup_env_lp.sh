@@ -30,10 +30,18 @@ echo "[envLP] pinning torch back to 2.3.0/cu121 (in case requirements bumped it)
   torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 \
   --index-url https://download.pytorch.org/whl/cu121
 
-echo "[envLP] downloading LivePortrait weights…"
-"$MAMBA" run -n "$ENV" huggingface-cli download KwaiVGI/LivePortrait \
-  --local-dir "$ROOT/LivePortrait/pretrained_weights" \
-  --exclude "*.git*" "README.md" "docs"
+# Weights: use the cached dataset (WEIGHTS_SRC/lp_weights) if provided, else download.
+LP_WTS="$ROOT/LivePortrait/pretrained_weights"
+if [ -n "${WEIGHTS_SRC:-}" ] && [ -d "$WEIGHTS_SRC/lp_weights" ]; then
+  echo "[envLP] restoring LivePortrait weights from cache: $WEIGHTS_SRC/lp_weights"
+  mkdir -p "$LP_WTS"
+  cp -rn "$WEIGHTS_SRC/lp_weights/." "$LP_WTS/"
+else
+  echo "[envLP] downloading LivePortrait weights…"
+  "$MAMBA" run -n "$ENV" huggingface-cli download KwaiVGI/LivePortrait \
+    --local-dir "$LP_WTS" \
+    --exclude "*.git*" "README.md" "docs"
+fi
 
 echo "[envLP] verifying torch…"
 "$MAMBA" run -n "$ENV" python -c "import torch, torchvision; print('torch', torch.__version__, 'tv', torchvision.__version__, 'cuda', torch.cuda.is_available())"

@@ -43,7 +43,15 @@ echo "[envMT] downloading MuseTalk weights via the Python API…"
 # needs <1.0) and fetch via the Python API instead.
 cd "$ROOT/MuseTalk"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir "huggingface_hub==0.30.2"
-"$MAMBA" run -n "$ENV" python "$SCRIPT_DIR/download_mt_weights.py"
+# Weights: use the cached dataset (WEIGHTS_SRC/mt_models) if provided, else download.
+if [ -n "${WEIGHTS_SRC:-}" ] && [ -d "$WEIGHTS_SRC/mt_models" ]; then
+  echo "[envMT] restoring MuseTalk weights from cache: $WEIGHTS_SRC/mt_models"
+  mkdir -p "$ROOT/MuseTalk/models"
+  cp -rn "$WEIGHTS_SRC/mt_models/." "$ROOT/MuseTalk/models/"
+else
+  echo "[envMT] downloading MuseTalk weights via the Python API…"
+  "$MAMBA" run -n "$ENV" python "$SCRIPT_DIR/download_mt_weights.py"
+fi
 
 echo "[envMT] verifying mmcv + musetalk weights…"
 "$MAMBA" run -n "$ENV" python -c "import torch, mmcv; print('torch', torch.__version__, 'mmcv', mmcv.__version__)"

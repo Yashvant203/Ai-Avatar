@@ -35,8 +35,9 @@ md(
     "Serves the **real** F5-TTS / LivePortrait / MuseTalk pipeline behind the FastAPI "
     "backend, exposed via a public cloudflared URL the website can call.\n\n"
     "**Settings → Accelerator: GPU T4 x2, Internet: ON.** "
-    "**Add Data → `ai-avatar-weights`** (mounted at `/kaggle/input/ai-avatar-weights`).\n\n"
-    "Run cells top to bottom. Env builds take ~30-50 min the first time."
+    "**Add Data → `ai-avatar-weights`** (mounted under `/kaggle/input/…`; cell 2 finds it).\n\n"
+    "Run cells top to bottom. With the cached weights dataset the env builds are mostly "
+    "pip installs (~20-35 min); without it they also download weights (~slower, flakier)."
 )
 
 code(
@@ -51,15 +52,24 @@ code(
 )
 
 code(
-    "# 2. Inspect the mounted weights dataset, then restore into /tmp/aiavatar.\n"
-    "# Confirm the layout matches restore_weights.sh; adjust SRC if the dataset nests differently.\n"
-    "import subprocess\n"
-    f"subprocess.run(['find','{DATASET}','-maxdepth','2'], check=False)\n"
-    f"subprocess.run(['bash','{RUNNERS}/restore_weights.sh','{DATASET}/aa_cache','{WORK}'], check=False)"
+    "# 2. Auto-locate the cached weights dataset and export WEIGHTS_SRC.\n"
+    "#    The env-setup cells below inherit os.environ, so they pick this up and use\n"
+    "#    the cache (lp_weights/mt_models/hf_cache) instead of re-downloading.\n"
+    "#    Kaggle mounts datasets at varying paths, so we search rather than hardcode.\n"
+    "import glob, os, subprocess\n"
+    "hits = glob.glob('/kaggle/input/**/lp_weights', recursive=True)\n"
+    "WEIGHTS_SRC = os.path.dirname(hits[0]) if hits else ''\n"
+    "if WEIGHTS_SRC:\n"
+    "    os.environ['WEIGHTS_SRC'] = WEIGHTS_SRC\n"
+    "    print('WEIGHTS_SRC =', WEIGHTS_SRC)\n"
+    "    subprocess.run(['ls','-la',WEIGHTS_SRC])\n"
+    "else:\n"
+    "    print('No cached weights found under /kaggle/input — env setup will DOWNLOAD weights.')\n"
+    "    print('If you added the ai-avatar-weights dataset, check: !ls -R /kaggle/input | head')"
 )
 
 code(
-    "# 3. Build envF5 (F5-TTS). Weights restored above, but pip still installs. ~8-12 min.\n"
+    "# 3. Build envF5 (F5-TTS). Uses WEIGHTS_SRC/hf_cache if set; pip still installs. ~8-12 min.\n"
     f"!bash {RUNNERS}/setup_env_f5.sh {WORK}"
 )
 code(

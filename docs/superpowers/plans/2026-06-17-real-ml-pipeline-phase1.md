@@ -30,6 +30,8 @@
 
 Tasks 1–3 below are otherwise as-implemented; Task 4 Step 3 (idle asset) is superseded by the above.
 
+**Weights-cache fix (during E2E bring-up):** the Phase 0 setup scripts always clone-if-absent then download weights, so the planned `restore_weights.sh` (run *before* setup) blocked the repo clone and was redundant. Replaced it: each `setup_env_*.sh` now honors a `WEIGHTS_SRC` env var — after cloning, it copies cached weights (`lp_weights`→LivePortrait `pretrained_weights`, `mt_models`→MuseTalk `models`, `hf_cache`→`/root/.cache/huggingface`) instead of downloading. The notebook's cell 2 auto-discovers the dataset under `/kaggle/input/**/lp_weights` and exports `WEIGHTS_SRC`. `restore_weights.sh` deleted.
+
 ---
 
 ## Key facts carried from Phase 0 (the contract the backend must honor)
