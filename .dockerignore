@@ -1,0 +1,22 @@
+# Keep the build context small + never ship local artifacts/secrets.
+**/.venv
+**/node_modules
+**/.next
+**/out
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+*.db
+*.db-wal
+*.db-shm
+**/.env
+**/.env.*
+!**/.env.example
+storage/uploads/*
+storage/avatars/*
+storage/voices/*
+storage/outputs/*
+ml_models/weights/*
+.git
+docs

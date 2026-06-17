@@ -1,0 +1,83 @@
+# --- Python / backend ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+
+# --- Node / frontend ---
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# --- Env & secrets ---
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# --- Databases ---
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# --- Storage artifacts (keep folders, ignore contents) ---
+storage/*
+!storage/uploads/
+!storage/avatars/
+!storage/voices/
+!storage/outputs/
+storage/uploads/*
+storage/avatars/*
+storage/voices/*
+storage/outputs/*
+!storage/**/.gitkeep
+
+# --- Model weights (large, downloaded). The ** closes the sub-directory gap ---
+ml_models/weights/**
+!ml_models/weights/**/
+!ml_models/weights/**/.gitkeep
+
+# --- Large model / checkpoint files anywhere (defensive for an ML repo) ---
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.bin
+*.h5
+*.gguf
+*.tar
+*.tar.gz
+*.zip
+
+# --- Cloud / Kaggle credentials (NEVER commit) ---
+kaggle.json
+*.pem
+*.key
+id_rsa*
+service-account*.json
+gcp-*.json
+
+# --- Local scratch: screenshots & sample media in the repo root ---
+/*.png
+/*.jpg
+/*.jpeg
+/*.mp4
+/*.mov
+/*.webm
+*_screenshot_*.png
+
+# --- OS / editors ---
+.DS_Store
+.idea/
+.vscode/
+*.swp

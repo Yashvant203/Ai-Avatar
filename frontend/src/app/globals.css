@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  /* Brutalist defaults: hard edges, no soft rounding anywhere by default. */
+  * {
+    border-radius: 0;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-mono font-bold uppercase tracking-tight;
+  }
+
+  a {
+    @apply underline decoration-[3px] underline-offset-4;
+  }
+
+  /* Visible, chunky focus ring for accessibility. */
+  :focus-visible {
+    @apply outline-none ring-4 ring-brut-blue;
+  }
+}
+
+@layer utilities {
+  /* Diagonal "warning tape" backdrop accent used on hero panels. */
+  .bg-stripes {
+    background-image: repeating-linear-gradient(
+      45deg,
+      theme("colors.ink") 0,
+      theme("colors.ink") 2px,
+      transparent 2px,
+      transparent 12px
+    );
+  }
+}
