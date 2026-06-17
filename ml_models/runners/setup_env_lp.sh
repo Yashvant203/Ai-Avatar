@@ -30,6 +30,9 @@ echo "[envLP] pinning torch back to 2.3.0/cu121 (in case requirements bumped it)
   torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 \
   --index-url https://download.pytorch.org/whl/cu121
 
+echo "[envLP] installing insightface (used by select_face.py / extract_driving.py)…"
+"$MAMBA" run -n "$ENV" pip install --no-cache-dir insightface onnxruntime-gpu
+
 # Weights: use the cached dataset (WEIGHTS_SRC/lp_weights) if provided, else download.
 LP_WTS="$ROOT/LivePortrait/pretrained_weights"
 if [ -n "${WEIGHTS_SRC:-}" ] && [ -d "$WEIGHTS_SRC/lp_weights" ]; then
