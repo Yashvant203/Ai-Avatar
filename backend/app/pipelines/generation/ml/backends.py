@@ -144,7 +144,7 @@ class RealBackend:
         from app.pipelines._subproc import run_in_env
 
         out_speech.parent.mkdir(parents=True, exist_ok=True)
-        runners = settings.RUNNERS_DIR
+        runners = str(Path(settings.RUNNERS_DIR).resolve())
         transcript = voice_ref.with_suffix(".txt") if voice_ref else None
         ref_text = transcript.read_text().strip() if transcript and transcript.exists() else ""
         run_in_env(
@@ -181,6 +181,7 @@ class RealBackend:
         from app.pipelines._subproc import run_in_env
 
         out_animated.parent.mkdir(parents=True, exist_ok=True)
+        runners = str(Path(settings.RUNNERS_DIR).resolve())
         # Drive with the avatar's OWN motion clip (cut from its upload); fall back
         # to the optional global idle clip only if the avatar has none.
         src_drive = (
@@ -222,7 +223,7 @@ class RealBackend:
             settings.ENV_LP,
             [
                 "bash",
-                f"{settings.RUNNERS_DIR}/run_liveportrait.sh",
+                f"{runners}/run_liveportrait.sh",
                 str(face),
                 str(looped),
                 str(out_dir),
@@ -247,6 +248,7 @@ class RealBackend:
         from app.pipelines._subproc import run_in_env
 
         out_lipsync.parent.mkdir(parents=True, exist_ok=True)
+        runners = str(Path(settings.RUNNERS_DIR).resolve())
         # MuseTalk wants 16 kHz mono audio.
         speech16 = out_lipsync.parent / "speech_16k.wav"
         run_ffmpeg(["-y", "-i", str(speech), "-ar", "16000", "-ac", "1", str(speech16)])
@@ -255,7 +257,7 @@ class RealBackend:
             settings.ENV_MT,
             [
                 "python",
-                f"{settings.RUNNERS_DIR}/run_musetalk.py",
+                f"{runners}/run_musetalk.py",
                 "--video",
                 str(animated),
                 "--audio",

@@ -201,7 +201,7 @@ class RealBackend:
             settings.ENV_F5,
             [
                 "python",
-                f"{settings.RUNNERS_DIR}/transcribe.py",
+                f"{Path(settings.RUNNERS_DIR).resolve()}/transcribe.py",
                 "--audio",
                 str(reference),
                 "--out",
@@ -227,7 +227,7 @@ class RealBackend:
             settings.ENV_LP,
             [
                 "python",
-                f"{settings.RUNNERS_DIR}/select_face.py",
+                f"{Path(settings.RUNNERS_DIR).resolve()}/select_face.py",
                 "--frames",
                 str(frame_dir),
                 "--out-face",
@@ -258,7 +258,7 @@ class RealBackend:
             settings.ENV_LP,
             [
                 "python",
-                f"{settings.RUNNERS_DIR}/extract_driving.py",
+                f"{Path(settings.RUNNERS_DIR).resolve()}/extract_driving.py",
                 "--video",
                 str(source_video),
                 "--window-seconds",
