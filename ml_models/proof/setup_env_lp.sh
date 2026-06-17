@@ -8,6 +8,7 @@ ROOT="${1:-/tmp/aiavatar}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MAMBA="$ROOT/bin/micromamba"
 export MAMBA_ROOT_PREFIX="$ROOT/mamba"
+export MPLBACKEND=Agg  # Kaggle's inline matplotlib backend is invalid in these envs
 cd "$ROOT"
 
 bash "$SCRIPT_DIR/bootstrap_micromamba.sh" "$ROOT"

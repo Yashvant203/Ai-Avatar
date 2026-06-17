@@ -7,4 +7,7 @@ set -euo pipefail
 
 ROOT="${PROOF_ROOT:-/tmp/aiavatar}"
 export MAMBA_ROOT_PREFIX="$ROOT/mamba"
+# Kaggle sets MPLBACKEND to its Jupyter inline backend, which isn't valid in these
+# standalone envs and crashes matplotlib on import. Force a headless backend.
+export MPLBACKEND=Agg
 exec "$ROOT/bin/micromamba" run -n "$1" "${@:2}"
