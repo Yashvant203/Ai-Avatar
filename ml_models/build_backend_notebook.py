@@ -68,6 +68,17 @@ code(
     "    print('If you added the ai-avatar-weights dataset, check: !ls -R /kaggle/input | head')"
 )
 
+md(
+    "### Fast path (optional): restore prebuilt envs\n"
+    "If you saved an **`ai-avatar-envs`** snapshot in a previous session, add that dataset "
+    "and run the cell below to restore the envs in ~3-5 min — then **SKIP cells 3-5** and go "
+    "straight to cell 6. (First time through, skip this and build the envs normally.)"
+)
+code(
+    "# Optional FAST PATH: restore prebuilt envs, then skip the three setup_env cells.\n"
+    f"!bash {RUNNERS}/restore_envs.sh"
+)
+
 code(
     "# 3. Build envF5 (F5-TTS). Uses WEIGHTS_SRC/hf_cache if set; pip still installs. ~8-12 min.\n"
     f"!bash {RUNNERS}/setup_env_f5.sh {WORK}"
@@ -79,6 +90,17 @@ code(
 code(
     "# 5. Build envMT (MuseTalk + mmcv). The riskiest install. ~15-25 min.\n"
     f"!bash {RUNNERS}/setup_env_mt.sh {WORK}"
+)
+
+md(
+    "### Save a snapshot (run ONCE, after the envs finish building)\n"
+    "Creates `aiavatar_envs.tgz`. Then: **Output panel -> aiavatar_envs.tgz -> New Dataset** "
+    "(name it `ai-avatar-envs`). Next session, add that dataset and use the restore cell above "
+    "to skip the ~25-min build. Skip this cell on restored/fast-path runs."
+)
+code(
+    "# Optional: snapshot the built envs to a tarball for reuse next session.\n"
+    f"!bash {RUNNERS}/snapshot_envs.sh"
 )
 
 code(
