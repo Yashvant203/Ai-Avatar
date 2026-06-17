@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MuseTalk v1.5 lip-sync (runs in env-B, invoked via conda run).
+"""MuseTalk v1.5 lip-sync (runs in env-B, invoked via micromamba / mrun.sh).
 
 Writes a one-task inference YAML, calls `scripts.inference`, and prints the result
 mp4 path. Must be invoked with CWD at the MuseTalk repo root (its imports are

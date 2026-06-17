@@ -19,12 +19,16 @@ The easy path: upload `proof_pipeline.ipynb` to Kaggle and Run All — it calls 
 scripts above in order.
 
 ## Environments
+Kaggle images don't reliably ship `conda`, so the setup scripts bootstrap
+**micromamba** (a standalone conda replacement, one static binary at
+`/kaggle/working/bin/micromamba`) and create the envs under `/kaggle/working/mamba`.
+
 | Env | Python | Torch | Holds |
 |-----|--------|-------|-------|
 | envA | 3.10 | 2.3.0 / cu121 | F5-TTS, LivePortrait, insightface |
 | envB | 3.10 | 2.0.1 / cu118 | MuseTalk, mmcv 2.0.1 / mmdet 3.1.0 / mmpose 1.1.0 |
 
-Run a script inside an env with: `conda run -n envA python ...`.
+Run a command inside an env with the helper: `bash mrun.sh envA python ...`.
 
 ## Weight caching (avoid re-downloading every session)
 After a successful run, save `/kaggle/working` model dirs as a Kaggle **Dataset**

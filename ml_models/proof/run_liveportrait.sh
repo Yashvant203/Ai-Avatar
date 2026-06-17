@@ -7,12 +7,13 @@ SRC="$1"
 DRV="$2"
 OUTDIR="$3"
 ROOT="${4:-/kaggle/working}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 mkdir -p "$OUTDIR"
 cd "$ROOT/LivePortrait"
 
 echo "[lp] animating $SRC with driving $DRV → $OUTDIR"
-conda run -n envA python inference.py -s "$SRC" -d "$DRV" -o "$OUTDIR"
+PROOF_ROOT="$ROOT" bash "$SCRIPT_DIR/mrun.sh" envA python inference.py -s "$SRC" -d "$DRV" -o "$OUTDIR"
 
 echo "[lp] outputs in $OUTDIR:"
 ls -1 "$OUTDIR"/*.mp4
