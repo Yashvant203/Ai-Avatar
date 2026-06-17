@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Protocol
 
 from app.core.logging import get_logger
-from app.pipelines.avatar_creation.ml.ffmpeg import run_ffmpeg
+from app.pipelines.avatar_creation.ml.ffmpeg import ffprobe_metadata, run_ffmpeg
 
 logger = get_logger("generation.backend")
 
@@ -33,7 +33,13 @@ class GenerationBackend(Protocol):
     ) -> float: ...
 
     def animate(
-        self, out_animated: Path, *, face: Path | None, duration_s: float, fps: int
+        self,
+        out_animated: Path,
+        *,
+        face: Path | None,
+        driving: Path | None,
+        duration_s: float,
+        fps: int,
     ) -> None: ...
 
     def lipsync(self, animated: Path, speech: Path, out_lipsync: Path) -> None: ...
@@ -66,8 +72,16 @@ class StubBackend:
         return duration_s
 
     def animate(
-        self, out_animated: Path, *, face: Path | None, duration_s: float, fps: int
+        self,
+        out_animated: Path,
+        *,
+        face: Path | None,
+        driving: Path | None = None,
+        duration_s: float,
+        fps: int,
     ) -> None:
+        # The stub has no reenactment model; it animates the still face. `driving`
+        # is accepted for interface parity but unused.
         out_animated.parent.mkdir(parents=True, exist_ok=True)
         if face is not None and Path(face).exists():
             run_ffmpeg(
@@ -108,34 +122,152 @@ class StubBackend:
 
 
 class RealBackend:
-    """Production stages with lazy heavy imports."""
+    """Production stages via subprocess into the isolated micromamba envs.
+
+    Each stage shells out through ml_models/runners/mrun.sh into envF5 / envLP /
+    envMT (the Phase-0 proven runners). File-based hand-off between stages keeps
+    the heavy ML stacks out of this process entirely.
+    """
 
     name = "real"
 
     @staticmethod
     def is_available() -> bool:
-        import importlib.util
+        from app.core.config import settings
 
-        return all(importlib.util.find_spec(m) is not None for m in ("torch", "f5_tts", "musetalk"))
+        return Path(settings.AI_ROOT, "mamba", "envs", settings.ENV_F5).exists()
 
     def synthesize_speech(
         self, out_speech: Path, *, script_text: str, voice_ref: Path | None, duration_s: float
     ) -> float:  # pragma: no cover - requires ML stack
-        import torch  # noqa: F401
-        import torchaudio
-        from f5_tts.api import F5TTS
+        from app.core.config import settings
+        from app.pipelines._subproc import run_in_env
 
-        engine = F5TTS(model=F5_VERSION, device="cuda")
-        wav, sr = engine.infer(ref_audio=str(voice_ref), gen_text=script_text)
-        torchaudio.save(str(out_speech), wav, sr)
-        return wav.shape[-1] / sr
+        out_speech.parent.mkdir(parents=True, exist_ok=True)
+        runners = settings.RUNNERS_DIR
+        transcript = voice_ref.with_suffix(".txt") if voice_ref else None
+        ref_text = transcript.read_text().strip() if transcript and transcript.exists() else ""
+        run_in_env(
+            settings.ENV_F5,
+            [
+                "python",
+                f"{runners}/run_f5tts.py",
+                "--ref",
+                str(voice_ref),
+                "--ref-text",
+                ref_text,
+                "--gen-text",
+                script_text,
+                "--out",
+                str(out_speech),
+            ],
+        )
+        # Measure the real synthesized duration with ffprobe (no torch in this env).
+        meta = ffprobe_metadata(out_speech)
+        return float(meta.get("duration_seconds") or duration_s)
 
     def animate(
-        self, out_animated: Path, *, face: Path | None, duration_s: float, fps: int
+        self,
+        out_animated: Path,
+        *,
+        face: Path | None,
+        driving: Path | None = None,
+        duration_s: float,
+        fps: int,
     ) -> None:  # pragma: no cover - requires ML stack
-        raise NotImplementedError("LivePortrait driving — see VIDEO_GENERATION_PIPELINE.md §4")
+        import glob
+
+        from app.core.config import settings
+        from app.pipelines._subproc import run_in_env
+
+        out_animated.parent.mkdir(parents=True, exist_ok=True)
+        # Drive with the avatar's OWN motion clip (cut from its upload); fall back
+        # to the optional global idle clip only if the avatar has none.
+        src_drive = (
+            str(driving) if driving and Path(driving).exists() else settings.IDLE_MOTION_PATH
+        )
+        # Build a seamless palindrome (forward+reverse) so the loop has no jump-cut,
+        # then loop it to >= speech duration at the target fps.
+        boomerang = out_animated.parent / "driving_boomerang.mp4"
+        run_ffmpeg(
+            [
+                "-y",
+                "-i",
+                src_drive,
+                "-filter_complex",
+                "[0:v]reverse[r];[0:v][r]concat=n=2:v=1[v]",
+                "-map",
+                "[v]",
+                "-an",
+                str(boomerang),
+            ]
+        )
+        looped = out_animated.parent / "driving_loop.mp4"
+        run_ffmpeg(
+            [
+                "-y",
+                "-stream_loop",
+                "-1",
+                "-i",
+                str(boomerang),
+                "-t",
+                f"{duration_s:.2f}",
+                "-r",
+                str(fps),
+                str(looped),
+            ]
+        )
+        out_dir = out_animated.parent / "lp_out"
+        run_in_env(
+            settings.ENV_LP,
+            [
+                "bash",
+                f"{settings.RUNNERS_DIR}/run_liveportrait.sh",
+                str(face),
+                str(looped),
+                str(out_dir),
+                settings.AI_ROOT,
+            ],
+        )
+        # Pick LivePortrait's clean output (NOT the *_concat comparison clip).
+        candidates = [f for f in sorted(glob.glob(f"{out_dir}/*.mp4")) if "concat" not in f]
+        if not candidates:
+            raise RuntimeError(f"LivePortrait produced no clean output in {out_dir}")
+        clean = candidates[-1]
+        # Normalize to the target fps so MuseTalk gets exactly 25 fps.
+        run_ffmpeg(["-y", "-i", clean, "-r", str(fps), str(out_animated)])
 
     def lipsync(
         self, animated: Path, speech: Path, out_lipsync: Path
     ) -> None:  # pragma: no cover - requires ML stack
-        raise NotImplementedError("MuseTalk lip-sync — see VIDEO_GENERATION_PIPELINE.md §4")
+        import glob
+        import shutil
+
+        from app.core.config import settings
+        from app.pipelines._subproc import run_in_env
+
+        out_lipsync.parent.mkdir(parents=True, exist_ok=True)
+        # MuseTalk wants 16 kHz mono audio.
+        speech16 = out_lipsync.parent / "speech_16k.wav"
+        run_ffmpeg(["-y", "-i", str(speech), "-ar", "16000", "-ac", "1", str(speech16)])
+        mt_out = out_lipsync.parent / "mt_out"
+        run_in_env(
+            settings.ENV_MT,
+            [
+                "python",
+                f"{settings.RUNNERS_DIR}/run_musetalk.py",
+                "--video",
+                str(animated),
+                "--audio",
+                str(speech16),
+                "--result-dir",
+                str(mt_out),
+                "--bbox-shift",
+                str(settings.MUSETALK_BBOX_SHIFT),
+            ],
+            cwd=f"{settings.AI_ROOT}/MuseTalk",
+        )
+        results = glob.glob(f"{mt_out}/**/*.mp4", recursive=True)
+        if not results:
+            raise RuntimeError(f"MuseTalk produced no output in {mt_out}")
+        shutil.copyfile(results[-1], out_lipsync)

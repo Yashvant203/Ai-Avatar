@@ -130,7 +130,7 @@ def test_pipeline_reaches_ready(pipeline_db, tmp_path, monkeypatch) -> None:
     # Artifacts on disk under the redirected storage root.
     adir = paths.avatar_dir(aid)
     vdir = paths.voice_dir(aid)
-    for f in ("profile.json", "face.png", "thumbnail.png", "motion_template.pkl"):
+    for f in ("profile.json", "face.png", "thumbnail.png", "driving.mp4"):
         assert (adir / f).exists(), f"missing {f}"
     for f in ("source_audio.wav", "reference.wav", "model.pt"):
         assert (vdir / f).exists(), f"missing {f}"

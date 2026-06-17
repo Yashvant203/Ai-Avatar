@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from app.core.paths import (
     avatar_dir,
+    avatar_driving_path,
     avatar_face_path,
-    avatar_motion_template_path,
     avatar_profile_path,
     avatar_thumbnail_path,
     ensure_dir,
@@ -38,7 +38,7 @@ from app.pipelines.avatar_creation.errors import VIDEO_INPUT_ERRORS, PipelineErr
 from app.pipelines.avatar_creation.ml.loaders import get_backend
 from app.pipelines.avatar_creation.steps import extract_audio, extract_face, profile
 from app.pipelines.avatar_creation.steps.clone_voice import build_voice_model
-from app.pipelines.avatar_creation.steps.liveportrait_prep import prep_appearance
+from app.pipelines.avatar_creation.steps.liveportrait_prep import prep_driving
 
 logger = get_logger("pipeline.runner")
 
@@ -133,17 +133,19 @@ def run_avatar_pipeline(avatar_id: int, *, db_factory=SessionLocal) -> None:
             # Stage 6 — head-pose statistics
             pose_stats = profile.head_pose_stats(face_meta.get("pose_samples", []))
 
-            # Stage 7 — LivePortrait appearance prep
-            motion_pkl = avatar_motion_template_path(avatar_id)
-            motion_meta = prep_appearance(backend, face=face_png, out_template=motion_pkl)
+            # Stage 7 — derive the avatar's driving clip (motion profile) from its upload
+            driving_mp4 = avatar_driving_path(avatar_id)
+            motion_meta = prep_driving(
+                backend, source_video=video.file_path, out_driving=driving_mp4
+            )
 
             # Stage 8 — assemble profile.json + checksum
             artifact_paths = {
                 "face": relpath(face_png),
                 "_face_abs": str(face_png),
                 "thumbnail": relpath(thumb_png),
-                "motion_template": relpath(motion_pkl),
-                "_motion_abs": str(motion_pkl),
+                "motion_template": relpath(driving_mp4),
+                "_motion_abs": str(driving_mp4),
                 "voice_model": relpath(model_pt),
                 "_voice_model_abs": str(model_pt),
                 "reference": relpath(ref),

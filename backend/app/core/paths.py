@@ -6,8 +6,8 @@ choke point that prevents `../` traversal and absolute-path escapes.
 
 Canonical layout (docs/SYSTEM_ARCHITECTURE.md, AVATAR_CREATION_PIPELINE.md):
     storage/uploads/{user_id}/{video_id}.mp4
-    storage/avatars/{avatar_id}/{profile.json, face.png, motion_template.pkl, thumbnail.png}
-    storage/voices/{avatar_id}/{reference.wav, source_audio.wav, model.pt}
+    storage/avatars/{avatar_id}/{profile.json, face.png, driving.mp4, thumbnail.png}
+    storage/voices/{avatar_id}/{reference.wav, reference.txt, source_audio.wav}
     storage/outputs/{job_id}/output.mp4
 """
 
@@ -62,8 +62,9 @@ def avatar_thumbnail_path(avatar_id: int) -> Path:
     return _safe_join("avatars", avatar_id, "thumbnail.png")
 
 
-def avatar_motion_template_path(avatar_id: int) -> Path:
-    return _safe_join("avatars", avatar_id, "motion_template.pkl")
+def avatar_driving_path(avatar_id: int) -> Path:
+    """The avatar's motion profile: a frontal driving clip cut from its own upload."""
+    return _safe_join("avatars", avatar_id, "driving.mp4")
 
 
 # --- voices ----------------------------------------------------------------
@@ -77,6 +78,11 @@ def voice_source_audio_path(avatar_id: int) -> Path:
 
 def voice_reference_path(avatar_id: int) -> Path:
     return _safe_join("voices", avatar_id, "reference.wav")
+
+
+def voice_transcript_path(avatar_id: int) -> Path:
+    """Whisper transcript of the reference clip (sits beside reference.wav)."""
+    return _safe_join("voices", avatar_id, "reference.txt")
 
 
 def voice_model_path(avatar_id: int) -> Path:
