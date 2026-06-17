@@ -79,9 +79,7 @@ function GenerateInner() {
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
         <h1 className="text-3xl">Generate a video</h1>
-        <p className="mt-1 font-sans text-sm text-ink/70">
-          Pick an avatar and type any script.
-        </p>
+        <p className="mt-1 font-sans text-sm text-ink/70">Pick an avatar and type any script.</p>
       </header>
       {error && <ErrorBanner message={error} />}
 

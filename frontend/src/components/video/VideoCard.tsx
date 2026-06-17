@@ -64,12 +64,7 @@ export function VideoCard({ video }: { video: GeneratedVideo }) {
 
       {error && <p className="font-mono text-xs font-bold text-brut-red">{error}</p>}
 
-      <Button
-        color="blue"
-        className="w-full"
-        disabled={busy === "download"}
-        onClick={download}
-      >
+      <Button color="blue" className="w-full" disabled={busy === "download"} onClick={download}>
         {busy === "download" ? "Downloading…" : "⬇ Download MP4"}
       </Button>
     </Card>
