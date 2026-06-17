@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     # deterministic stub (ffmpeg + stdlib) so the pipeline runs without a GPU.
     PIPELINE_BACKEND: str = "auto"  # auto | real | stub
 
+    # --- Real ML pipeline (subprocess runners) ---
+    AI_ROOT: str = "/tmp/aiavatar"  # micromamba envs + model repos live here
+    RUNNERS_DIR: str = "../ml_models/runners"  # relative to backend/ cwd
+    IDLE_MOTION_PATH: str = "../ml_models/assets/idle_motion.mp4"
+    MUSETALK_BBOX_SHIFT: int = 0  # tune per-face; range hint -20..18
+    ENV_F5: str = "envF5"
+    ENV_LP: str = "envLP"
+    ENV_MT: str = "envMT"
+
     # Video generation
     MAX_SCRIPT_CHARS: int = 5000
     WORDS_PER_SECOND: float = 2.5  # speaking rate for duration estimates
