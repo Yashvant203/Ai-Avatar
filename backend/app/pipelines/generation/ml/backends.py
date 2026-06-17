@@ -33,7 +33,13 @@ class GenerationBackend(Protocol):
     ) -> float: ...
 
     def animate(
-        self, out_animated: Path, *, face: Path | None, duration_s: float, fps: int
+        self,
+        out_animated: Path,
+        *,
+        face: Path | None,
+        driving: Path | None,
+        duration_s: float,
+        fps: int,
     ) -> None: ...
 
     def lipsync(self, animated: Path, speech: Path, out_lipsync: Path) -> None: ...
@@ -66,8 +72,16 @@ class StubBackend:
         return duration_s
 
     def animate(
-        self, out_animated: Path, *, face: Path | None, duration_s: float, fps: int
+        self,
+        out_animated: Path,
+        *,
+        face: Path | None,
+        driving: Path | None = None,
+        duration_s: float,
+        fps: int,
     ) -> None:
+        # The stub has no reenactment model; it animates the still face. `driving`
+        # is accepted for interface parity but unused.
         out_animated.parent.mkdir(parents=True, exist_ok=True)
         if face is not None and Path(face).exists():
             run_ffmpeg(
@@ -132,9 +146,7 @@ class RealBackend:
         out_speech.parent.mkdir(parents=True, exist_ok=True)
         runners = settings.RUNNERS_DIR
         transcript = voice_ref.with_suffix(".txt") if voice_ref else None
-        ref_text = (
-            transcript.read_text().strip() if transcript and transcript.exists() else ""
-        )
+        ref_text = transcript.read_text().strip() if transcript and transcript.exists() else ""
         run_in_env(
             settings.ENV_F5,
             [
@@ -155,7 +167,13 @@ class RealBackend:
         return float(meta.get("duration_seconds") or duration_s)
 
     def animate(
-        self, out_animated: Path, *, face: Path | None, duration_s: float, fps: int
+        self,
+        out_animated: Path,
+        *,
+        face: Path | None,
+        driving: Path | None = None,
+        duration_s: float,
+        fps: int,
     ) -> None:  # pragma: no cover - requires ML stack
         import glob
 
@@ -163,7 +181,27 @@ class RealBackend:
         from app.pipelines._subproc import run_in_env
 
         out_animated.parent.mkdir(parents=True, exist_ok=True)
-        # Loop the camera-facing idle clip to >= speech duration at the target fps.
+        # Drive with the avatar's OWN motion clip (cut from its upload); fall back
+        # to the optional global idle clip only if the avatar has none.
+        src_drive = (
+            str(driving) if driving and Path(driving).exists() else settings.IDLE_MOTION_PATH
+        )
+        # Build a seamless palindrome (forward+reverse) so the loop has no jump-cut,
+        # then loop it to >= speech duration at the target fps.
+        boomerang = out_animated.parent / "driving_boomerang.mp4"
+        run_ffmpeg(
+            [
+                "-y",
+                "-i",
+                src_drive,
+                "-filter_complex",
+                "[0:v]reverse[r];[0:v][r]concat=n=2:v=1[v]",
+                "-map",
+                "[v]",
+                "-an",
+                str(boomerang),
+            ]
+        )
         looped = out_animated.parent / "driving_loop.mp4"
         run_ffmpeg(
             [
@@ -171,7 +209,7 @@ class RealBackend:
                 "-stream_loop",
                 "-1",
                 "-i",
-                settings.IDLE_MOTION_PATH,
+                str(boomerang),
                 "-t",
                 f"{duration_s:.2f}",
                 "-r",

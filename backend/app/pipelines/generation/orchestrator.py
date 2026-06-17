@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.paths import (
+    avatar_driving_path,
     avatar_face_path,
     ensure_dir,
     output_animated_path,
@@ -105,9 +106,14 @@ def run_generation_job(
         # Stage 2 — LivePortrait animation
         db_queue.set_progress(db, job, progress.band_start("liveportrait"))
         face = avatar_face_path(job.avatar_id)
+        driving = avatar_driving_path(job.avatar_id)
         animated = output_animated_path(job.id)
         backend.animate(
-            animated, face=face if face.exists() else None, duration_s=duration, fps=fps
+            animated,
+            face=face if face.exists() else None,
+            driving=driving if driving.exists() else None,
+            duration_s=duration,
+            fps=fps,
         )
         db_queue.set_progress(db, job, progress.band_end("liveportrait"))
         _guard_cancel(db, job)

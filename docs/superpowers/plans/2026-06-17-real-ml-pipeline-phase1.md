@@ -15,6 +15,23 @@
 
 ---
 
+## Revision (2026-06-17, during execution): per-avatar driving clip — NOT a shared idle clip
+
+**Decision (by the user, mid-execution):** Each avatar's motion must come from **its own uploaded training video**, not a shared global idle clip. LivePortrait is driving-based (it *replays* motion from a driving video; it cannot synthesize novel script-aware motion and has no per-person training step). The strongest fit is **self-reenactment**: cut a frontal, stable window from the user's upload and use it as the LivePortrait driving input, palindrome-looped to the speech length. MuseTalk then overwrites the mouth to match the cloned-voice audio.
+
+**Artifacts stored per avatar:** `face.png` (identity), `driving.mp4` (motion profile — replaces `motion_template.pkl`), `reference.wav` + `reference.txt` (voice + transcript), `profile.json`.
+
+**Code deltas vs the tasks below (all implemented):**
+- Avatar creation Stage 7: `prep_appearance` (no-op) → **`prep_driving(source_video, out_driving)`**. Real backend picks the best window via a new `ml_models/runners/extract_driving.py` (insightface, envLP) then ffmpeg-cuts `driving.mp4` at 25 fps; stub cuts a centered segment.
+- Generation `animate(...)` gains a **`driving`** param; it palindrome-loops the avatar's `driving.mp4` (fallback: `IDLE_MOTION_PATH`) and feeds it to LivePortrait. `orchestrator.py` passes `avatar_driving_path(job.avatar_id)`.
+- `paths.py`: `avatar_motion_template_path` → **`avatar_driving_path`** (`avatars/{id}/driving.mp4`); added `voice_transcript_path`.
+- `config.py`: added `DRIVING_SECONDS=6.0`; `IDLE_MOTION_PATH` kept only as an optional fallback. **The committed `ml_models/assets/idle_motion.mp4` asset (Task 4 Step 3) is dropped** — no longer needed.
+- Transcript source decision (Task 3 Step 2 open item): **Whisper at build time** via `ml_models/runners/transcribe.py`.
+
+Tasks 1–3 below are otherwise as-implemented; Task 4 Step 3 (idle asset) is superseded by the above.
+
+---
+
 ## Key facts carried from Phase 0 (the contract the backend must honor)
 
 - **Envs** under `/tmp/aiavatar` (the big disk): `envF5` (F5-TTS), `envLP` (torch2.3/cu121 + LivePortrait + insightface), `envMT` (torch2.0.1/cu118 + MuseTalk + mmcv). Run a command in one via `bash ml_models/proof/mrun.sh <env> <cmd…>` (honors `PROOF_ROOT`, default `/tmp/aiavatar`).

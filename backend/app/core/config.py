@@ -55,8 +55,14 @@ class Settings(BaseSettings):
     # --- Real ML pipeline (subprocess runners) ---
     AI_ROOT: str = "/tmp/aiavatar"  # micromamba envs + model repos live here
     RUNNERS_DIR: str = "../ml_models/runners"  # relative to backend/ cwd
-    IDLE_MOTION_PATH: str = "../ml_models/assets/idle_motion.mp4"
     MUSETALK_BBOX_SHIFT: int = 0  # tune per-face; range hint -20..18
+    # Each avatar's motion comes from its OWN uploaded video: at creation we cut a
+    # frontal, stable window of this length as the avatar's driving clip, then loop
+    # it (palindrome) to the speech length at generation time.
+    DRIVING_SECONDS: float = 6.0
+    # Optional global fallback driving clip if an avatar has no driving.mp4 (unset
+    # by default — the per-avatar clip is the real source of motion).
+    IDLE_MOTION_PATH: str = "../ml_models/assets/idle_motion.mp4"
     ENV_F5: str = "envF5"
     ENV_LP: str = "envLP"
     ENV_MT: str = "envMT"

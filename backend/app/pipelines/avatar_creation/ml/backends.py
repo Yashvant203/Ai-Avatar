@@ -21,7 +21,7 @@ from typing import Protocol
 
 from app.core.logging import get_logger
 from app.pipelines.avatar_creation.errors import PipelineError
-from app.pipelines.avatar_creation.ml.ffmpeg import run_ffmpeg
+from app.pipelines.avatar_creation.ml.ffmpeg import ffprobe_metadata, run_ffmpeg
 
 logger = get_logger("pipeline.backend")
 
@@ -44,7 +44,7 @@ class AvatarBackend(Protocol):
 
     def select_best_face(self, frame_dir: Path, out_face: Path, out_thumb: Path) -> dict: ...
 
-    def prep_appearance(self, face: Path, out_template: Path) -> dict: ...
+    def prep_driving(self, source_video: Path, out_driving: Path) -> dict: ...
 
 
 # --------------------------------------------------------------------------- #
@@ -112,16 +112,30 @@ class StubBackend:
             "pose_samples": [],
         }
 
-    def prep_appearance(self, face: Path, out_template: Path) -> dict:
-        template = {
-            "kind": "liveportrait_appearance",
-            "backend": "stub",
-            "model_version": LIVEPORTRAIT_VERSION,
-            "source_face": str(face),
-        }
-        with out_template.open("wb") as fh:
-            pickle.dump(template, fh)
-        return {"path": str(out_template), "model": LIVEPORTRAIT_VERSION}
+    def prep_driving(self, source_video: Path, out_driving: Path) -> dict:
+        # The avatar's motion profile is a short clip of its own upload. Stub mode
+        # just cuts a centered segment at 25 fps (no insightface windowing).
+        out_driving.parent.mkdir(parents=True, exist_ok=True)
+        meta = ffprobe_metadata(source_video)
+        dur = float(meta.get("duration_seconds") or 6.0)
+        seg = 6.0
+        start = max(0.0, dur / 2 - seg / 2)
+        run_ffmpeg(
+            [
+                "-y",
+                "-ss",
+                f"{start:.2f}",
+                "-i",
+                str(source_video),
+                "-t",
+                f"{seg:.2f}",
+                "-r",
+                "25",
+                "-an",
+                str(out_driving),
+            ]
+        )
+        return {"path": str(out_driving), "model": LIVEPORTRAIT_VERSION}
 
 
 # --------------------------------------------------------------------------- #
@@ -132,8 +146,9 @@ class RealBackend:
 
     Importing this module never pulls in torch/insightface; every ML-heavy step
     shells out through ml_models/runners/mrun.sh into envF5 (F5-TTS/Whisper) or
-    envLP (insightface). Appearance prep is a no-op — animation is recomputed per
-    generation from the shared idle-motion clip (see VIDEO_GENERATION_PIPELINE).
+    envLP (insightface). Each avatar's motion profile (driving.mp4) is cut from
+    its OWN uploaded video by prep_driving and later replayed by LivePortrait at
+    generation time (see VIDEO_GENERATION_PIPELINE).
     """
 
     name = "real"
@@ -152,7 +167,18 @@ class RealBackend:
         # by build_voice_model via Whisper.)
         out_reference.parent.mkdir(parents=True, exist_ok=True)
         run_ffmpeg(
-            ["-y", "-i", str(source_audio), "-t", "10", "-ac", "1", "-ar", "24000", str(out_reference)]
+            [
+                "-y",
+                "-i",
+                str(source_audio),
+                "-t",
+                "10",
+                "-ac",
+                "1",
+                "-ar",
+                "24000",
+                str(out_reference),
+            ]
         )
         return {
             "reference_path": str(out_reference),
@@ -173,7 +199,14 @@ class RealBackend:
         txt = reference.with_suffix(".txt")
         run_in_env(
             settings.ENV_F5,
-            ["python", f"{settings.RUNNERS_DIR}/transcribe.py", "--audio", str(reference), "--out", str(txt)],
+            [
+                "python",
+                f"{settings.RUNNERS_DIR}/transcribe.py",
+                "--audio",
+                str(reference),
+                "--out",
+                str(txt),
+            ],
         )
         ref_text = txt.read_text().strip() if txt.exists() else ""
         return {
@@ -210,14 +243,52 @@ class RealBackend:
             raise PipelineError("NO_FACE_DETECTED", "no face found in sampled frames")
         return result
 
-    def prep_appearance(
-        self, face: Path, out_template: Path
+    def prep_driving(
+        self, source_video: Path, out_driving: Path
     ) -> dict:  # pragma: no cover - requires ML stack
-        # No per-avatar template: the shared idle motion drives animation at
-        # generation time, so this stage is validation/placeholder only.
-        out_template.parent.mkdir(parents=True, exist_ok=True)
-        out_template.write_bytes(b"")
-        return {"path": str(out_template), "model": LIVEPORTRAIT_VERSION}
+        # The avatar's motion profile = a frontal, stable window cut from its OWN
+        # uploaded video. insightface (envLP) picks the window; ffmpeg cuts it at
+        # 25 fps. This clip is later palindrome-looped to the speech length and
+        # used as the LivePortrait driving input at generation time.
+        from app.core.config import settings
+        from app.pipelines._subproc import run_in_env
+
+        out_driving.parent.mkdir(parents=True, exist_ok=True)
+        stdout = run_in_env(
+            settings.ENV_LP,
+            [
+                "python",
+                f"{settings.RUNNERS_DIR}/extract_driving.py",
+                "--video",
+                str(source_video),
+                "--window-seconds",
+                str(settings.DRIVING_SECONDS),
+            ],
+        )
+        window = _parse_last_json(stdout) or {}
+        if window.get("error") or "start" not in window:
+            # Fallback: centered window (e.g. detector cold or no clean frontal span).
+            meta = ffprobe_metadata(source_video)
+            dur = float(meta.get("duration_seconds") or settings.DRIVING_SECONDS)
+            start = max(0.0, dur / 2 - settings.DRIVING_SECONDS / 2)
+        else:
+            start = float(window["start"])
+        run_ffmpeg(
+            [
+                "-y",
+                "-ss",
+                f"{start:.2f}",
+                "-i",
+                str(source_video),
+                "-t",
+                f"{settings.DRIVING_SECONDS:.2f}",
+                "-r",
+                "25",
+                "-an",
+                str(out_driving),
+            ]
+        )
+        return {"path": str(out_driving), "model": LIVEPORTRAIT_VERSION, "window_start_s": start}
 
 
 def _parse_last_json(stdout: str) -> dict | None:
