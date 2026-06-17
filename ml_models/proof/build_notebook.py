@@ -68,11 +68,11 @@ code("# 6. Loop the driving clip to the speech length, then animate with LivePor
      f"subprocess.run(['bash','{PROOF}/run_liveportrait.sh',\n"
      f"    '{WORK}/LivePortrait/assets/examples/source/s9.jpg',\n"
      f"    '{WORK}/driving_loop.mp4','{WORK}/lp_out','{WORK}'], check=True)\n"
-     f"import glob; animated = sorted(glob.glob('{WORK}/lp_out/*.mp4'))[-1]; print('animated:', animated)")
+     f"import glob; animated = [f for f in sorted(glob.glob('{WORK}/lp_out/*.mp4')) if 'concat' not in f][-1]; print('animated:', animated)")
 
 code("# 7. Normalize to MuseTalk inputs: 25fps video + 16kHz mono audio.\n"
      "import glob, subprocess\n"
-     f"animated = sorted(glob.glob('{WORK}/lp_out/*.mp4'))[-1]\n"
+     f"animated = [f for f in sorted(glob.glob('{WORK}/lp_out/*.mp4')) if 'concat' not in f][-1]\n"
      f"subprocess.run(['ffmpeg','-y','-i',animated,'-r','25','{WORK}/animated_25.mp4'], check=True)\n"
      f"subprocess.run(['ffmpeg','-y','-i','{WORK}/speech.wav','-ar','16000','-ac','1','{WORK}/speech_16k.wav'], check=True)\n"
      "print('normalized inputs ready')")
