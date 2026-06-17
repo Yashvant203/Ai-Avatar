@@ -1,8 +1,8 @@
-"""Lazy, cached model loaders + backend selection.
+"""Backend selection for the avatar-creation pipeline.
 
-Real model instances (insightface, LivePortrait) are expensive to construct, so
-they are created once and shared across jobs. On a single GPU this keeps weights
-warm between avatar creations (see SYSTEM_ARCHITECTURE.md, AI pipeline section).
+The real backend runs ML in isolated micromamba envs via subprocess (see
+ml/backends.py + _subproc.py), so there are no in-process model loaders here any
+more — just the cached backend selector.
 """
 
 from __future__ import annotations
@@ -32,25 +32,3 @@ def get_backend() -> AvatarBackend:
         backend = RealBackend() if RealBackend.is_available() else StubBackend()
     logger.info("Avatar pipeline backend: %s", backend.name)
     return backend
-
-
-@lru_cache(maxsize=1)
-def get_face_analyzer():  # pragma: no cover - requires ML stack
-    """Lazily construct and cache the insightface analyzer."""
-    from insightface.app import FaceAnalysis
-
-    app = FaceAnalysis(name="buffalo_l")
-    app.prepare(ctx_id=0, det_size=(640, 640))
-    return app
-
-
-@lru_cache(maxsize=1)
-def get_liveportrait():  # pragma: no cover - requires ML stack
-    """Lazily construct and cache the LivePortrait pipeline.
-
-    Placeholder loader — wire to the real LivePortrait entrypoint and the weights
-    under ml_models/weights/liveportrait/ when integrating the model.
-    """
-    raise NotImplementedError(
-        "LivePortrait integration pending — see AVATAR_CREATION_PIPELINE.md §7"
-    )
