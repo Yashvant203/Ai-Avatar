@@ -37,15 +37,13 @@ echo "[envMT] installing MMLab stack via mim (mmengine → mmcv → mmdet → mm
   || "$MAMBA" run -n "$ENV" pip install --no-cache-dir "chumpy@git+https://github.com/mattloper/chumpy.git"
 "$MAMBA" run -n "$ENV" mim install "mmpose==1.1.0"
 
-echo "[envMT] downloading MuseTalk weights (force public HF endpoint)…"
+echo "[envMT] downloading MuseTalk weights via the Python API…"
+# MuseTalk's download_weights.sh uses `huggingface-cli`, a no-op on huggingface_hub
+# >=1.0 (silently downloads nothing). Keep hf_hub at 0.30.2 (transformers 4.39.2
+# needs <1.0) and fetch via the Python API instead.
 cd "$ROOT/MuseTalk"
-sed -i 's#https://hf-mirror.com#https://huggingface.co#g' download_weights.sh || true
-"$MAMBA" run -n "$ENV" bash download_weights.sh
-
-# download_weights.sh runs `pip install -U huggingface_hub[cli]`, which upgrades it
-# to >=1.0 and breaks transformers 4.39.2 (needs <1.0). Pin it back.
-echo "[envMT] pinning huggingface_hub back to 0.30.2 (download_weights.sh bumped it)…"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir "huggingface_hub==0.30.2"
+"$MAMBA" run -n "$ENV" python "$SCRIPT_DIR/download_mt_weights.py"
 
 echo "[envMT] verifying mmcv + musetalk weights…"
 "$MAMBA" run -n "$ENV" python -c "import torch, mmcv; print('torch', torch.__version__, 'mmcv', mmcv.__version__)"
