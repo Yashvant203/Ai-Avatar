@@ -9,6 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MAMBA="$ROOT/bin/micromamba"
 export MAMBA_ROOT_PREFIX="$ROOT/mamba"
 export MPLBACKEND=Agg
+export HF_HUB_DOWNLOAD_TIMEOUT=60  # default 10s is too tight on Kaggle's flaky CDN
 cd "$ROOT"
 
 bash "$SCRIPT_DIR/bootstrap_micromamba.sh" "$ROOT"
@@ -62,9 +63,14 @@ if [ -n "${WEIGHTS_SRC:-}" ] && [ -d "$WEIGHTS_SRC/em_weights" ]; then
 else
   echo "[envEM] downloading EchoMimic v2 weights (BadToBest/EchoMimicV2)…"
   # Skip the *_acc.pth accelerated variants (~5 GB) — the standard infer.py we drive
-  # uses the non-acc weights. Saves scarce Kaggle disk.
-  "$MAMBA" run -n "$ENV" huggingface-cli download BadToBest/EchoMimicV2 \
-    --local-dir "$WTS" --exclude "*.git*" "README.md" "*_acc.pth"
+  # uses the non-acc weights. Saves scarce Kaggle disk. Retry: HF's CDN times out on
+  # Kaggle; each attempt resumes the partial files already on disk.
+  for attempt in 1 2 3 4 5; do
+    "$MAMBA" run -n "$ENV" huggingface-cli download BadToBest/EchoMimicV2 \
+      --local-dir "$WTS" --exclude "*.git*" "README.md" "*_acc.pth" && break
+    echo "[envEM] weights download attempt $attempt failed; retrying (resumes)…"
+    sleep 5
+  done
 fi
 
 # Some infer.yaml paths reference external base models; fetch only if missing.
