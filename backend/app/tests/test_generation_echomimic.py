@@ -46,3 +46,19 @@ def test_stub_generate_video_makes_playable_mp4(tmp_path) -> None:
     assert out.exists() and out.stat().st_size > 0
     meta = ffprobe_metadata(out)
     assert meta.get("duration_seconds") and meta["duration_seconds"] > 1.0
+
+
+def test_stub_generate_video_without_reference_uses_fallback(tmp_path) -> None:
+    # No half-body reference (e.g. avatar predates the feature): testsrc fallback,
+    # audio still muxed, output still playable.
+    audio = tmp_path / "speech.wav"
+    out = tmp_path / "out.mp4"
+    _make_audio(audio)
+
+    StubBackend().generate_video(
+        reference_image=None, audio=audio, out_video=out, duration_s=2.0, fps=25
+    )
+
+    assert out.exists() and out.stat().st_size > 0
+    meta = ffprobe_metadata(out)
+    assert meta.get("duration_seconds") and meta["duration_seconds"] > 1.0

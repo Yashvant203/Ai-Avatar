@@ -1,4 +1,8 @@
-"""Generation job orchestration: F5-TTS → LivePortrait → MuseTalk → ffmpeg mux.
+"""Generation job orchestration: F5-TTS → visual engine → ffmpeg mux.
+
+The visual stage is one of two engines, chosen by settings.GENERATION_ENGINE:
+  - "liveportrait": LivePortrait head motion → MuseTalk lip-sync (default)
+  - "echomimic":    EchoMimic v2 single pass (half-body + hand gestures)
 
 Drives one claimed job to completion with banded progress, cancellation checks
 between stages, and failure handling per VIDEO_GENERATION_PIPELINE.md. The
@@ -108,6 +112,9 @@ def run_generation_job(
         # (half-body + gestures). Both write the pre-mux clip to the lipsync path.
         lipsync = output_lipsync_path(job.id)
         if settings.GENERATION_ENGINE.lower() == "echomimic":
+            # One diffusion call covers both legacy visual stages, so it reuses the
+            # combined liveportrait→musetalk progress window (band_start liveportrait
+            # .. band_end musetalk) rather than adding a separate band.
             db_queue.set_progress(db, job, progress.band_start("liveportrait"))
             halfbody = avatar_halfbody_path(job.avatar_id)
             backend.generate_video(
