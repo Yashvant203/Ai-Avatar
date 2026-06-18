@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     ENV_LP: str = "envLP"
     ENV_MT: str = "envMT"
     ENV_EM: str = "envEM"
+    # When False, avatar creation selects the face/half-body frame + driving clip
+    # with ffmpeg only (no insightface), so the heavy envLP env can be skipped on
+    # small-disk hosts (e.g. the EchoMimic-only setup on free Kaggle). Likeness then
+    # depends on a clean, frontal upload rather than detector-picked framing.
+    USE_INSIGHTFACE: bool = True
 
     # --- EchoMimic v2 (alternative generation engine, half-body + hand gestures) ---
     # Which visual engine the generation orchestrator uses:

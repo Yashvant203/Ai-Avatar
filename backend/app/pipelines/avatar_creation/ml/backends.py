@@ -31,6 +31,56 @@ INSIGHTFACE_MODEL = "buffalo_l"
 MUSETALK_TARGET = "musetalk-v1"
 
 
+def _ffmpeg_select_face(
+    frame_dir: Path, out_face: Path, out_thumb: Path, out_halfbody: Path
+) -> dict:
+    """Pick a frame with ffmpeg only (no insightface) and write face/thumb/half-body.
+
+    Used by the stub, and by RealBackend when settings.USE_INSIGHTFACE is False
+    (lets the EchoMimic path skip the heavy envLP env on small-disk hosts). The
+    half-body reference is the full chosen frame (head+torso+arms) for EchoMimic v2;
+    likeness then depends on a clean, frontal upload rather than detector framing.
+    """
+    out_face.parent.mkdir(parents=True, exist_ok=True)
+    frames = sorted(frame_dir.glob("*.jpg"))
+    if not frames:
+        raise PipelineError("NO_FACE_DETECTED", "no frames sampled from video")
+    chosen = frames[len(frames) // 2]
+    run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=512:512", str(out_face)])
+    run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=256:256", str(out_thumb)])
+    run_ffmpeg(["-y", "-i", str(chosen), str(out_halfbody)])  # full frame, native size
+    return {
+        "bbox": [0, 0, 512, 512],
+        "crop_size": [512, 512],
+        "quality_score": 0.5,
+        "pose_samples": [],
+    }
+
+
+def _ffmpeg_prep_driving(source_video: Path, out_driving: Path, *, seconds: float = 6.0) -> dict:
+    """Cut a centered clip with ffmpeg only (no insightface windowing)."""
+    out_driving.parent.mkdir(parents=True, exist_ok=True)
+    meta = ffprobe_metadata(source_video)
+    dur = float(meta.get("duration_seconds") or seconds)
+    start = max(0.0, dur / 2 - seconds / 2)
+    run_ffmpeg(
+        [
+            "-y",
+            "-ss",
+            f"{start:.2f}",
+            "-i",
+            str(source_video),
+            "-t",
+            f"{seconds:.2f}",
+            "-r",
+            "25",
+            "-an",
+            str(out_driving),
+        ]
+    )
+    return {"path": str(out_driving), "model": LIVEPORTRAIT_VERSION}
+
+
 class AvatarBackend(Protocol):
     name: str
 
@@ -102,48 +152,10 @@ class StubBackend:
     def select_best_face(
         self, frame_dir: Path, out_face: Path, out_thumb: Path, out_halfbody: Path
     ) -> dict:
-        frames = sorted(frame_dir.glob("*.jpg"))
-        if not frames:
-            raise PipelineError("NO_FACE_DETECTED", "no frames sampled from video")
-        # Use the middle frame; scale to the documented sizes via ffmpeg.
-        chosen = frames[len(frames) // 2]
-        run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=512:512", str(out_face)])
-        run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=256:256", str(out_thumb)])
-        # Half-body reference: scaled to EchoMimic's frame size for the stub (aspect
-        # ratio not preserved — the real path emits the native frame; the stub is a
-        # GPU-free placeholder only).
-        run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=768:768", str(out_halfbody)])
-        return {
-            "bbox": [0, 0, 512, 512],
-            "crop_size": [512, 512],
-            "quality_score": 0.5,
-            "pose_samples": [],
-        }
+        return _ffmpeg_select_face(frame_dir, out_face, out_thumb, out_halfbody)
 
     def prep_driving(self, source_video: Path, out_driving: Path) -> dict:
-        # The avatar's motion profile is a short clip of its own upload. Stub mode
-        # just cuts a centered segment at 25 fps (no insightface windowing).
-        out_driving.parent.mkdir(parents=True, exist_ok=True)
-        meta = ffprobe_metadata(source_video)
-        dur = float(meta.get("duration_seconds") or 6.0)
-        seg = 6.0
-        start = max(0.0, dur / 2 - seg / 2)
-        run_ffmpeg(
-            [
-                "-y",
-                "-ss",
-                f"{start:.2f}",
-                "-i",
-                str(source_video),
-                "-t",
-                f"{seg:.2f}",
-                "-r",
-                "25",
-                "-an",
-                str(out_driving),
-            ]
-        )
-        return {"path": str(out_driving), "model": LIVEPORTRAIT_VERSION}
+        return _ffmpeg_prep_driving(source_video, out_driving, seconds=6.0)
 
 
 # --------------------------------------------------------------------------- #
@@ -228,6 +240,11 @@ class RealBackend:
         self, frame_dir: Path, out_face: Path, out_thumb: Path, out_halfbody: Path
     ) -> dict:  # pragma: no cover - requires ML stack
         from app.core.config import settings
+
+        # Small-disk hosts (EchoMimic-only) skip envLP: pick the frame with ffmpeg.
+        if not settings.USE_INSIGHTFACE:
+            return _ffmpeg_select_face(frame_dir, out_face, out_thumb, out_halfbody)
+
         from app.pipelines._subproc import run_in_env
 
         out_face.parent.mkdir(parents=True, exist_ok=True)
@@ -261,6 +278,12 @@ class RealBackend:
         # 25 fps. This clip is later palindrome-looped to the speech length and
         # used as the LivePortrait driving input at generation time.
         from app.core.config import settings
+
+        # Small-disk hosts (EchoMimic-only) skip envLP: centered ffmpeg window. The
+        # driving clip is unused by the echomimic engine, but keep the artifact.
+        if not settings.USE_INSIGHTFACE:
+            return _ffmpeg_prep_driving(source_video, out_driving, seconds=settings.DRIVING_SECONDS)
+
         from app.pipelines._subproc import run_in_env
 
         out_driving.parent.mkdir(parents=True, exist_ok=True)

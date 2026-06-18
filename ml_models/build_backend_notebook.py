@@ -84,11 +84,14 @@ code(
     f"!bash {RUNNERS}/setup_env_f5.sh {WORK}"
 )
 code(
-    "# 4. Build envLP (LivePortrait + insightface). ~8-12 min.\n"
+    "# 4. (OPTIONAL — LivePortrait engine only) Build envLP (LivePortrait + insightface).\n"
+    "#     SKIP for the EchoMimic-only setup: launch with USE_INSIGHTFACE=false (cell 7)\n"
+    "#     so avatar creation picks the face frame with ffmpeg instead of insightface.\n"
     f"!bash {RUNNERS}/setup_env_lp.sh {WORK}"
 )
 code(
-    "# 5. Build envMT (MuseTalk + mmcv). The riskiest install. ~15-25 min.\n"
+    "# 5. (OPTIONAL — LivePortrait engine only) Build envMT (MuseTalk + mmcv).\n"
+    "#     SKIP for the EchoMimic-only setup (EchoMimic does its own lip-sync).\n"
     f"!bash {RUNNERS}/setup_env_mt.sh {WORK}"
 )
 code(
@@ -123,6 +126,7 @@ code(
     "srv_env = {**os.environ,\n"
     "    'PIPELINE_BACKEND': 'real',\n"
     "    'GENERATION_ENGINE': 'echomimic',\n"
+    "    'USE_INSIGHTFACE': 'false',  # EchoMimic-only: ffmpeg face selection, no envLP\n"
     "    'JWT_SECRET': secrets.token_urlsafe(48),\n"
     "    'CORS_ORIGINS': '*',\n"
     f"    'STORAGE_DIR': '{STORAGE}',\n"
