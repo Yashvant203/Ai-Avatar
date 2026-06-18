@@ -31,9 +31,12 @@ echo "[envEM] installing EchoMimic requirements…"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir -r "$REPO/requirements.txt"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir --no-deps facenet_pytorch==2.6.0
 
-echo "[envEM] pinning torch back to 2.5.1/cu121 (in case requirements bumped it)…"
+echo "[envEM] pinning torch + xformers back (in case requirements bumped them)…"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir --force-reinstall --no-deps \
   torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
+  --index-url https://download.pytorch.org/whl/cu121
+"$MAMBA" run -n "$ENV" pip install --no-cache-dir --force-reinstall --no-deps \
+  xformers==0.0.28.post3 \
   --index-url https://download.pytorch.org/whl/cu121
 
 # Weights: cached dataset (WEIGHTS_SRC/em_weights) if provided, else download.
