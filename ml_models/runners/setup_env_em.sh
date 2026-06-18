@@ -61,8 +61,10 @@ if [ -n "${WEIGHTS_SRC:-}" ] && [ -d "$WEIGHTS_SRC/em_weights" ]; then
   cp -rn "$WEIGHTS_SRC/em_weights/." "$WTS/"
 else
   echo "[envEM] downloading EchoMimic v2 weights (BadToBest/EchoMimicV2)…"
+  # Skip the *_acc.pth accelerated variants (~5 GB) — the standard infer.py we drive
+  # uses the non-acc weights. Saves scarce Kaggle disk.
   "$MAMBA" run -n "$ENV" huggingface-cli download BadToBest/EchoMimicV2 \
-    --local-dir "$WTS" --exclude "*.git*" "README.md"
+    --local-dir "$WTS" --exclude "*.git*" "README.md" "*_acc.pth"
 fi
 
 # Some infer.yaml paths reference external base models; fetch only if missing.
@@ -72,6 +74,14 @@ fi
 [ -d "$WTS/wav2vec2-base-960h" ] || \
   "$MAMBA" run -n "$ENV" huggingface-cli download facebook/wav2vec2-base-960h \
     --local-dir "$WTS/wav2vec2-base-960h" --exclude "*.git*" || true
+
+# Reclaim disk: huggingface-cli keeps a second copy of every download in the hub
+# cache. The local-dir copies (real files) are what infer.py reads, so drop the
+# EchoMimic-related hub-cache blobs. Leave other models (e.g. envF5's) untouched.
+for m in BadToBest--EchoMimicV2 lambdalabs--sd-image-variations-diffusers facebook--wav2vec2-base-960h; do
+  rm -rf "/root/.cache/huggingface/hub/models--$m" 2>/dev/null || true
+done
+rm -rf "$WTS/.cache" 2>/dev/null || true
 
 echo "[envEM] verifying torch + key weights…"
 "$MAMBA" run -n "$ENV" python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
