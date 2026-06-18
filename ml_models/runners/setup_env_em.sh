@@ -27,6 +27,16 @@ echo "[envEM] installing torch 2.5.1 / cu121 + xformers…"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir xformers==0.0.28.post3 \
   --index-url https://download.pytorch.org/whl/cu121
 
+# OpenAI CLIP (a requirements.txt entry) has a legacy setup.py that breaks under
+# the newest setuptools pip uses in its ISOLATED build env. Pin build tooling and
+# install CLIP first with --no-build-isolation so it uses the env's setuptools;
+# the matching spec then registers as "already satisfied" in requirements.txt.
+echo "[envEM] pinning build tooling (CLIP's legacy setup.py needs older setuptools)…"
+"$MAMBA" run -n "$ENV" pip install --no-cache-dir -U "setuptools<81" wheel
+echo "[envEM] installing OpenAI CLIP (no build isolation)…"
+"$MAMBA" run -n "$ENV" pip install --no-cache-dir --no-build-isolation \
+  "clip @ https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip#sha256=b5842c25da441d6c581b53a5c60e0c2127ebafe0f746f8e15561a006c6c3be6a"
+
 echo "[envEM] installing EchoMimic requirements…"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir -r "$REPO/requirements.txt"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir --no-deps facenet_pytorch==2.6.0
