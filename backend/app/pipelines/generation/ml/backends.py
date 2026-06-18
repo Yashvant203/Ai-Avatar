@@ -23,6 +23,7 @@ logger = get_logger("generation.backend")
 F5_VERSION = "f5-tts-base-v1"
 LIVEPORTRAIT_VERSION = "liveportrait-v1"
 MUSETALK_VERSION = "musetalk-v1"
+ECHOMIMIC_VERSION = "echomimic-v2"
 
 
 class GenerationBackend(Protocol):
@@ -338,3 +339,59 @@ class RealBackend:
         if not results:
             raise RuntimeError(f"MuseTalk produced no output in {mt_out}")
         shutil.copyfile(results[-1], out_lipsync)
+
+    def generate_video(
+        self,
+        out_video: Path,
+        *,
+        reference_image: Path | None,
+        audio: Path,
+        duration_s: float,
+        fps: int,
+    ) -> None:  # pragma: no cover - requires ML stack
+        from app.core.config import settings
+        from app.pipelines._subproc import run_in_env
+
+        out_video.parent.mkdir(parents=True, exist_ok=True)
+        runners = str(Path(settings.RUNNERS_DIR).resolve())
+        if reference_image is None or not Path(reference_image).exists():
+            raise RuntimeError(
+                "EchoMimic requires a half-body reference image; recreate the avatar "
+                "on this branch so reference_halfbody.png is generated."
+            )
+        # EchoMimic v2 expects 16 kHz mono audio (whisper-based audio encoder).
+        audio16 = out_video.parent / "speech_16k.wav"
+        run_ffmpeg(["-y", "-i", str(audio), "-ar", "16000", "-ac", "1", str(audio16)])
+        repo = f"{settings.AI_ROOT}/EchoMimicV2"
+        run_in_env(
+            settings.ENV_EM,
+            [
+                "python",
+                f"{runners}/echomimic_generate.py",
+                "--reference",
+                str(reference_image),
+                "--audio",
+                str(audio16),
+                "--repo",
+                repo,
+                "--pose-name",
+                settings.ECHOMIMIC_POSE_NAME,
+                "--out",
+                str(out_video),
+                "--width",
+                str(settings.ECHOMIMIC_WIDTH),
+                "--height",
+                str(settings.ECHOMIMIC_HEIGHT),
+                "--steps",
+                str(settings.ECHOMIMIC_STEPS),
+                "--cfg",
+                str(settings.ECHOMIMIC_CFG),
+                "--fps",
+                str(fps),
+                "--seconds",
+                f"{duration_s:.3f}",
+            ],
+            cwd=repo,
+        )
+        if not out_video.exists() or out_video.stat().st_size == 0:
+            raise RuntimeError("EchoMimic produced no output video")
