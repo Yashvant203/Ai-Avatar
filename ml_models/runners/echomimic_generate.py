@@ -47,7 +47,9 @@ def _build_looped_pose(src_pose_dir: str, dst_pose_dir: str, n_frames: int) -> i
     # forward + reverse(without endpoints) = seamless palindrome cycle
     cycle = srcs + srcs[-2:0:-1] if len(srcs) > 2 else srcs
     os.makedirs(dst_pose_dir, exist_ok=True)
-    count = max(n_frames, len(srcs))
+    # Match the AUDIO length: if the template is longer, take only the first n_frames
+    # (don't render extra silent seconds); if shorter, the palindrome cycle loops it.
+    count = n_frames
     for i in range(count):
         data = np.load(cycle[i % len(cycle)], allow_pickle=True)
         np.save(os.path.join(dst_pose_dir, f"{i}.npy"), data)
