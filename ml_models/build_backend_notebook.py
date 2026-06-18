@@ -91,6 +91,11 @@ code(
     "# 5. Build envMT (MuseTalk + mmcv). The riskiest install. ~15-25 min.\n"
     f"!bash {RUNNERS}/setup_env_mt.sh {WORK}"
 )
+code(
+    "# 5b. Build envEM (EchoMimic v2 — half-body + hand gestures). Heavy; ~25-40 min,\n"
+    "#     and inference is SLOW on a T4. Only needed for the EchoMimic comparison.\n"
+    f"!bash {RUNNERS}/setup_env_em.sh {WORK}"
+)
 
 md(
     "### Save a snapshot (run ONCE, after the envs finish building)\n"
@@ -117,6 +122,7 @@ code(
     "import os, secrets, subprocess, time\n"
     "srv_env = {**os.environ,\n"
     "    'PIPELINE_BACKEND': 'real',\n"
+    "    'GENERATION_ENGINE': 'echomimic',\n"
     "    'JWT_SECRET': secrets.token_urlsafe(48),\n"
     "    'CORS_ORIGINS': '*',\n"
     f"    'STORAGE_DIR': '{STORAGE}',\n"
@@ -163,7 +169,9 @@ md(
     "3. Sign up → **Create Avatar** → upload a 20-30 s video of yourself → wait for *ready*.\n"
     "4. **Generate** → type a script → download the MP4 (your face + voice, lip-synced).\n\n"
     "Logs: `/tmp/aiavatar/{api,worker,tunnel}.log`. Tune `MUSETALK_BBOX_SHIFT` "
-    "(env var) if the mouth needs alignment. Keep this kernel running while you use the site."
+    "(env var) if the mouth needs alignment. Keep this kernel running while you use the site.\n\n"
+    "This branch defaults to the EchoMimic v2 engine (half-body + gestures); "
+    "set `GENERATION_ENGINE=liveportrait` in cell 7 to compare against the head-only path."
 )
 
 
