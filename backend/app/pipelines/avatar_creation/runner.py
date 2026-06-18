@@ -19,6 +19,7 @@ from app.core.paths import (
     avatar_dir,
     avatar_driving_path,
     avatar_face_path,
+    avatar_halfbody_path,
     avatar_profile_path,
     avatar_thumbnail_path,
     ensure_dir,
@@ -124,11 +125,12 @@ def run_avatar_pipeline(avatar_id: int, *, db_factory=SessionLocal) -> None:
                 sample_rate=voice.sample_rate,
             )
 
-            # Stage 5 — frames + best face
+            # Stage 5 — frames + best face + half-body reference
             extract_face.sample_frames(video.file_path, frame_dir)
             face_png = avatar_face_path(avatar_id)
             thumb_png = avatar_thumbnail_path(avatar_id)
-            face_meta = backend.select_best_face(frame_dir, face_png, thumb_png)
+            halfbody_png = avatar_halfbody_path(avatar_id)
+            face_meta = backend.select_best_face(frame_dir, face_png, thumb_png, halfbody_png)
 
             # Stage 6 — head-pose statistics
             pose_stats = profile.head_pose_stats(face_meta.get("pose_samples", []))
@@ -144,6 +146,8 @@ def run_avatar_pipeline(avatar_id: int, *, db_factory=SessionLocal) -> None:
                 "face": relpath(face_png),
                 "_face_abs": str(face_png),
                 "thumbnail": relpath(thumb_png),
+                "reference_halfbody": relpath(halfbody_png),
+                "_halfbody_abs": str(halfbody_png),
                 "motion_template": relpath(driving_mp4),
                 "_motion_abs": str(driving_mp4),
                 "voice_model": relpath(model_pt),

@@ -23,6 +23,7 @@ def main() -> None:
     p.add_argument("--frames", required=True)
     p.add_argument("--out-face", required=True)
     p.add_argument("--out-thumb", required=True)
+    p.add_argument("--out-halfbody", required=True)
     args = p.parse_args()
 
     app = FaceAnalysis(name="buffalo_l")
@@ -57,6 +58,8 @@ def main() -> None:
     crop = img[max(0, y1 - pad) : min(h, y2 + pad), max(0, x1 - pad) : min(w, x2 + pad)]
     cv2.imwrite(args.out_face, cv2.resize(crop, (512, 512)))
     cv2.imwrite(args.out_thumb, cv2.resize(crop, (256, 256)))
+    # Half-body reference = the full chosen frame (head+torso+arms), for EchoMimic v2.
+    cv2.imwrite(args.out_halfbody, img)
     print(
         json.dumps(
             {

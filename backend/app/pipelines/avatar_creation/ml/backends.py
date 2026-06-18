@@ -42,7 +42,9 @@ class AvatarBackend(Protocol):
         self, reference: Path, transcript: str, out_model: Path, *, sample_rate: int
     ) -> dict: ...
 
-    def select_best_face(self, frame_dir: Path, out_face: Path, out_thumb: Path) -> dict: ...
+    def select_best_face(
+        self, frame_dir: Path, out_face: Path, out_thumb: Path, out_halfbody: Path
+    ) -> dict: ...
 
     def prep_driving(self, source_video: Path, out_driving: Path) -> dict: ...
 
@@ -97,7 +99,9 @@ class StubBackend:
             pickle.dump(artifact, fh)
         return {"model_path": str(out_model), "model_version": F5_VERSION}
 
-    def select_best_face(self, frame_dir: Path, out_face: Path, out_thumb: Path) -> dict:
+    def select_best_face(
+        self, frame_dir: Path, out_face: Path, out_thumb: Path, out_halfbody: Path
+    ) -> dict:
         frames = sorted(frame_dir.glob("*.jpg"))
         if not frames:
             raise PipelineError("NO_FACE_DETECTED", "no frames sampled from video")
@@ -105,6 +109,8 @@ class StubBackend:
         chosen = frames[len(frames) // 2]
         run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=512:512", str(out_face)])
         run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=256:256", str(out_thumb)])
+        # Half-body reference: the full chosen frame scaled to EchoMimic's frame size.
+        run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=768:768", str(out_halfbody)])
         return {
             "bbox": [0, 0, 512, 512],
             "crop_size": [512, 512],
@@ -217,7 +223,7 @@ class RealBackend:
         }
 
     def select_best_face(
-        self, frame_dir: Path, out_face: Path, out_thumb: Path
+        self, frame_dir: Path, out_face: Path, out_thumb: Path, out_halfbody: Path
     ) -> dict:  # pragma: no cover - requires ML stack
         from app.core.config import settings
         from app.pipelines._subproc import run_in_env
@@ -234,6 +240,8 @@ class RealBackend:
                 str(out_face),
                 "--out-thumb",
                 str(out_thumb),
+                "--out-halfbody",
+                str(out_halfbody),
             ],
         )
         result = _parse_last_json(stdout)
