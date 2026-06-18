@@ -83,10 +83,13 @@ def main() -> None:
     ref_dir = os.path.join(work, "ref")
     aud_dir = os.path.join(work, "aud")
     pose_root = os.path.join(work, "pose")
-    os.makedirs(ref_dir, exist_ok=True)
-    os.makedirs(aud_dir, exist_ok=True)
-    shutil.copyfile(args.reference, os.path.join(ref_dir, "ref.png"))
-    shutil.copyfile(args.audio, os.path.join(aud_dir, "aud.wav"))
+    # infer.py derives a flag via refimg_name.split('/')[-2], so the name MUST contain
+    # a subdirectory (its demo default is "natural_bk_openhand/0035.png"). Stage our
+    # inputs one level deep under a "clip/" subdir to satisfy that.
+    os.makedirs(os.path.join(ref_dir, "clip"), exist_ok=True)
+    os.makedirs(os.path.join(aud_dir, "clip"), exist_ok=True)
+    shutil.copyfile(args.reference, os.path.join(ref_dir, "clip", "ref.png"))
+    shutil.copyfile(args.audio, os.path.join(aud_dir, "clip", "aud.wav"))
     frames = _build_looped_pose(src_pose_dir, os.path.join(pose_root, "loop"), n_frames)
 
     out_root = os.path.join(args.repo, "outputs")
@@ -97,8 +100,8 @@ def main() -> None:
         "--config", "./configs/prompts/infer.yaml",
         "-W", str(args.width), "-H", str(args.height), "-L", str(frames),
         "--steps", str(args.steps), "--cfg", str(args.cfg), "--fps", str(args.fps),
-        "--ref_images_dir", ref_dir, "--refimg_name", "ref.png",
-        "--audio_dir", aud_dir, "--audio_name", "aud.wav",
+        "--ref_images_dir", ref_dir, "--refimg_name", "clip/ref.png",
+        "--audio_dir", aud_dir, "--audio_name", "clip/aud.wav",
         "--pose_dir", pose_root, "--pose_name", "loop",
     ]
     print("[echomimic] running:", " ".join(cmd), flush=True)
