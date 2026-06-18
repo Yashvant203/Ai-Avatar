@@ -176,3 +176,26 @@ bundled pose template dir ───────────┤
 - Confirm **HuggingFace weight repo id + file layout** for the `WEIGHTS_SRC` cache.
 - Confirm whether EchoMimic v2 weight download lands under `${AI_ROOT}` (for
   snapshot) or in `~/.cache/huggingface` (already in the snapshot include list).
+
+### Resolved (during planning, from antgroup/echomimic_v2)
+
+- **Env:** Python 3.10, `torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1
+  xformers==0.0.28.post3` (cu121), `requirements.txt`, `facenet_pytorch==2.6.0 --no-deps`.
+  `setup_env_em.sh` re-pins both torch AND xformers after `requirements.txt` to guard
+  against a transitive bump (the Kaggle-dependency-stability concern).
+- **Inference CLI:** `python infer.py --config ./configs/prompts/infer.yaml` with args
+  `-W -H -L --steps --cfg --fps --ref_images_dir --refimg_name --audio_dir --audio_name
+  --pose_dir --pose_name`. Pose templates are numbered `.npy` files under
+  `assets/halfbody_demo/pose/<name>/`; output MP4 lands under `outputs/`. The runner
+  `echomimic_generate.py` stages our inputs into that layout and copies the result out.
+- **Weights:** `BadToBest/EchoMimicV2` → `pretrained_weights/` (denoising_unet.pth,
+  reference_unet.pth, motion_module.pth, pose_encoder.pth, sd-vae-ft-mse/,
+  audio_processor/tiny.pt); plus sd-image-variations-diffusers + wav2vec2-base-960h
+  (fetched only if missing). Weights live under `${AI_ROOT}/EchoMimicV2`, so the
+  existing `snapshot_envs.sh` (which tars all of `${AI_ROOT}`) captures them.
+- **Output length is bounded by the pose template.** The runner palindrome-loops the
+  pose `.npy` sequence to cover the audio length (mirrors the LivePortrait boomerang),
+  so gestures repeat for long scripts rather than truncating.
+- **Engine selection:** `GENERATION_ENGINE` (config) chosen as `ECHOMIMIC_POSE` →
+  renamed `ECHOMIMIC_POSE_NAME`; pose templates are used in-place from the cloned repo
+  (not vendored into this repo).
