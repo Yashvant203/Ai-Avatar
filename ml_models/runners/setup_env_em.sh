@@ -80,11 +80,24 @@ fi
 [ -d "$WTS/wav2vec2-base-960h" ] || \
   "$MAMBA" run -n "$ENV" huggingface-cli download facebook/wav2vec2-base-960h \
     --local-dir "$WTS/wav2vec2-base-960h" --exclude "*.git*" || true
+# VAE (infer.py loads this unconditionally). Grab only the safetensors weights + config.
+[ -d "$WTS/sd-vae-ft-mse" ] || \
+  "$MAMBA" run -n "$ENV" huggingface-cli download stabilityai/sd-vae-ft-mse \
+    --local-dir "$WTS/sd-vae-ft-mse" \
+    --include "config.json" "diffusion_pytorch_model.safetensors" || true
+# Whisper-tiny audio encoder (infer.py loads audio_processor/tiny.pt unconditionally).
+if [ ! -f "$WTS/audio_processor/tiny.pt" ]; then
+  mkdir -p "$WTS/audio_processor"
+  wget -q -O "$WTS/audio_processor/tiny.pt" \
+    "https://openaipublic.azureedge.net/main/whisper/models/65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9/tiny.pt" || true
+fi
+# NOTE: infer.yaml also lists audio_mapper-50000.pth + AutoFlow, but infer.py never
+# loads them (confirmed) — so they are intentionally NOT fetched.
 
 # Reclaim disk: huggingface-cli keeps a second copy of every download in the hub
 # cache. The local-dir copies (real files) are what infer.py reads, so drop the
 # EchoMimic-related hub-cache blobs. Leave other models (e.g. envF5's) untouched.
-for m in BadToBest--EchoMimicV2 lambdalabs--sd-image-variations-diffusers facebook--wav2vec2-base-960h; do
+for m in BadToBest--EchoMimicV2 lambdalabs--sd-image-variations-diffusers facebook--wav2vec2-base-960h stabilityai--sd-vae-ft-mse; do
   rm -rf "/root/.cache/huggingface/hub/models--$m" 2>/dev/null || true
 done
 rm -rf "$WTS/.cache" 2>/dev/null || true
