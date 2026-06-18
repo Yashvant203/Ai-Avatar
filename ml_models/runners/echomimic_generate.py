@@ -71,6 +71,15 @@ def main() -> None:
     p.add_argument("--seconds", type=float, default=0.0)
     args = p.parse_args()
 
+    # The bundled EchoMimic pose templates are rendered on a fixed 768x768 canvas;
+    # infer.py builds the frame buffer at W×H and assigns the 768 pose mask into it,
+    # so any W/H != 768 raises a broadcast error. Force 768 (tune speed via --steps).
+    if args.width != 768 or args.height != 768:
+        print(f"[echomimic] forcing {args.width}x{args.height} -> 768x768 "
+              "(bundled pose template canvas); use --steps to trade speed/quality.")
+        args.width = 768
+        args.height = 768
+
     # EchoMimic shells out to ffmpeg via FFMPEG_PATH (dir containing the binary).
     if "FFMPEG_PATH" not in os.environ:
         ff = shutil.which("ffmpeg")
