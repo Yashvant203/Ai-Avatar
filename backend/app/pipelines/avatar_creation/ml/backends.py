@@ -109,7 +109,9 @@ class StubBackend:
         chosen = frames[len(frames) // 2]
         run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=512:512", str(out_face)])
         run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=256:256", str(out_thumb)])
-        # Half-body reference: the full chosen frame scaled to EchoMimic's frame size.
+        # Half-body reference: scaled to EchoMimic's frame size for the stub (aspect
+        # ratio not preserved — the real path emits the native frame; the stub is a
+        # GPU-free placeholder only).
         run_ffmpeg(["-y", "-i", str(chosen), "-vf", "scale=768:768", str(out_halfbody)])
         return {
             "bbox": [0, 0, 512, 512],

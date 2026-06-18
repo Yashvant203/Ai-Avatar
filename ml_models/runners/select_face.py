@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Pick the sharpest frontal face from sampled frames, crop to 512x512 (runs in envLP).
 
-insightface ships with LivePortrait's envLP. Writes face.png + thumb.png and prints
-a single JSON object as the LAST stdout line (bbox, crop_size, quality_score,
-pose_samples) for the backend to parse. On no face, the JSON is {"error":
-"NO_FACE_DETECTED"} (still exit 0 so the backend, not the shell, decides).
+insightface ships with LivePortrait's envLP. Writes face.png + thumb.png + the full
+half-body frame (reference_halfbody.png, for EchoMimic v2) and prints a single JSON
+object as the LAST stdout line (bbox, crop_size, quality_score, pose_samples) for the
+backend to parse. On no face, the JSON is {"error": "NO_FACE_DETECTED"} (still exit 0
+so the backend, not the shell, decides).
 
 Usage:
-  python select_face.py --frames FRAME_DIR --out-face face.png --out-thumb thumb.png
+  python select_face.py --frames FRAME_DIR --out-face face.png --out-thumb thumb.png \
+    --out-halfbody reference_halfbody.png
 """
 import argparse
 import glob
