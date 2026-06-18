@@ -67,6 +67,11 @@ def avatar_driving_path(avatar_id: int) -> Path:
     return _safe_join("avatars", avatar_id, "driving.mp4")
 
 
+def avatar_halfbody_path(avatar_id: int) -> Path:
+    """Half-body still (head+torso+arms) selected from the upload; feeds EchoMimic v2."""
+    return _safe_join("avatars", avatar_id, "reference_halfbody.png")
+
+
 # --- voices ----------------------------------------------------------------
 def voice_dir(avatar_id: int) -> Path:
     return _safe_join("voices", avatar_id)
