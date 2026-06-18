@@ -66,6 +66,22 @@ class Settings(BaseSettings):
     ENV_F5: str = "envF5"
     ENV_LP: str = "envLP"
     ENV_MT: str = "envMT"
+    ENV_EM: str = "envEM"
+
+    # --- EchoMimic v2 (alternative generation engine, half-body + hand gestures) ---
+    # Which visual engine the generation orchestrator uses:
+    #   "liveportrait" → LivePortrait head motion + MuseTalk lip-sync (default)
+    #   "echomimic"    → EchoMimic v2 single diffusion pass (gestures + lip-sync)
+    GENERATION_ENGINE: str = "liveportrait"  # liveportrait | echomimic
+    # EchoMimic v2 ships bundled pose templates under its repo's
+    # assets/halfbody_demo/pose/<NAME>; "01" is the default demo gesture sequence.
+    ECHOMIMIC_POSE_NAME: str = "01"
+    # Conservative T4 defaults: EchoMimic v2 is a heavy diffusion model. Smaller
+    # frame size + fewer steps reduce VRAM/time; raise on bigger GPUs.
+    ECHOMIMIC_WIDTH: int = 768
+    ECHOMIMIC_HEIGHT: int = 768
+    ECHOMIMIC_STEPS: int = 20
+    ECHOMIMIC_CFG: float = 2.5
 
     # Video generation
     MAX_SCRIPT_CHARS: int = 5000
