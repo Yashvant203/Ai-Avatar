@@ -104,11 +104,19 @@ def main() -> None:
         "--audio_dir", aud_dir, "--audio_name", "clip/aud.wav",
         "--pose_dir", pose_root, "--pose_name", "loop",
     ]
-    print("[echomimic] running:", " ".join(cmd), flush=True)
-    proc = subprocess.run(cmd, cwd=args.repo, capture_output=True, text=True)
+    # Stream infer.py's output to a tailable log beside the output video so progress
+    # (tqdm step bars) is visible live — the calling backend captures THIS script's
+    # stdout, so without a side log the diffusion looks frozen until it finishes.
+    log_path = os.path.join(os.path.dirname(os.path.abspath(args.out)), "echomimic_infer.log")
+    print(f"[echomimic] running (live log: {log_path}):", " ".join(cmd), flush=True)
+    with open(log_path, "w") as lf:
+        proc = subprocess.run(cmd, cwd=args.repo, stdout=lf, stderr=subprocess.STDOUT, text=True)
     if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "")[-3000:]
-        if "out of memory" in tail.lower() or "CUDA out of memory" in tail:
+        try:
+            tail = open(log_path).read()[-3000:]
+        except OSError:
+            tail = ""
+        if "out of memory" in tail.lower():
             print("[echomimic] CUDA OUT OF MEMORY — lower ECHOMIMIC_WIDTH/HEIGHT/STEPS "
                   "or use a larger GPU.", file=sys.stderr)
         print(tail, file=sys.stderr)
