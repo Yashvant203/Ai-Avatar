@@ -37,8 +37,12 @@ echo "[envEM] installing OpenAI CLIP (no build isolation)…"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir --no-build-isolation \
   "clip @ https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip#sha256=b5842c25da441d6c581b53a5c60e0c2127ebafe0f746f8e15561a006c6c3be6a"
 
-echo "[envEM] installing EchoMimic requirements…"
-"$MAMBA" run -n "$ENV" pip install --no-cache-dir -r "$REPO/requirements.txt"
+echo "[envEM] installing EchoMimic requirements (CLIP already installed; filtered out)…"
+# pip re-fetches+rebuilds direct-URL reqs even when installed, so the clip @ url line
+# would fail again under build isolation. Drop it from the list; clip is already in.
+REQ_NOCLIP="/tmp/echomimic_req_noclip.txt"
+grep -ivE '^[[:space:]]*clip[[:space:]]*@' "$REPO/requirements.txt" > "$REQ_NOCLIP"
+"$MAMBA" run -n "$ENV" pip install --no-cache-dir -r "$REQ_NOCLIP"
 "$MAMBA" run -n "$ENV" pip install --no-cache-dir --no-deps facenet_pytorch==2.6.0
 
 echo "[envEM] pinning torch + xformers back (in case requirements bumped them)…"
