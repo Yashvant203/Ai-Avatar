@@ -18,6 +18,7 @@ from app.core.logging import get_logger
 from app.core.paths import (
     avatar_driving_path,
     avatar_face_path,
+    avatar_halfbody_path,
     ensure_dir,
     output_animated_path,
     output_dir,
@@ -103,27 +104,42 @@ def run_generation_job(
         db_queue.set_progress(db, job, progress.band_end("f5_tts"))
         _guard_cancel(db, job)
 
-        # Stage 2 — LivePortrait animation
-        db_queue.set_progress(db, job, progress.band_start("liveportrait"))
-        face = avatar_face_path(job.avatar_id)
-        driving = avatar_driving_path(job.avatar_id)
-        animated = output_animated_path(job.id)
-        backend.animate(
-            animated,
-            face=face if face.exists() else None,
-            driving=driving if driving.exists() else None,
-            duration_s=duration,
-            fps=fps,
-        )
-        db_queue.set_progress(db, job, progress.band_end("liveportrait"))
-        _guard_cancel(db, job)
-
-        # Stage 3 — MuseTalk lip-sync
-        db_queue.set_progress(db, job, progress.band_start("musetalk"))
+        # Stages 2–3 — visual. Either LivePortrait+MuseTalk (head) or EchoMimic v2
+        # (half-body + gestures). Both write the pre-mux clip to the lipsync path.
         lipsync = output_lipsync_path(job.id)
-        backend.lipsync(animated, speech, lipsync)
-        db_queue.set_progress(db, job, progress.band_end("musetalk"))
-        _guard_cancel(db, job)
+        if settings.GENERATION_ENGINE.lower() == "echomimic":
+            db_queue.set_progress(db, job, progress.band_start("liveportrait"))
+            halfbody = avatar_halfbody_path(job.avatar_id)
+            backend.generate_video(
+                lipsync,
+                reference_image=halfbody if halfbody.exists() else None,
+                audio=speech,
+                duration_s=duration,
+                fps=fps,
+            )
+            db_queue.set_progress(db, job, progress.band_end("musetalk"))
+            _guard_cancel(db, job)
+        else:
+            # Stage 2 — LivePortrait animation
+            db_queue.set_progress(db, job, progress.band_start("liveportrait"))
+            face = avatar_face_path(job.avatar_id)
+            driving = avatar_driving_path(job.avatar_id)
+            animated = output_animated_path(job.id)
+            backend.animate(
+                animated,
+                face=face if face.exists() else None,
+                driving=driving if driving.exists() else None,
+                duration_s=duration,
+                fps=fps,
+            )
+            db_queue.set_progress(db, job, progress.band_end("liveportrait"))
+            _guard_cancel(db, job)
+
+            # Stage 3 — MuseTalk lip-sync
+            db_queue.set_progress(db, job, progress.band_start("musetalk"))
+            backend.lipsync(animated, speech, lipsync)
+            db_queue.set_progress(db, job, progress.band_end("musetalk"))
+            _guard_cancel(db, job)
 
         # Stage 4 — ffmpeg mux + thumbnail
         db_queue.set_progress(db, job, progress.band_start("mux"))

@@ -44,6 +44,16 @@ class GenerationBackend(Protocol):
 
     def lipsync(self, animated: Path, speech: Path, out_lipsync: Path) -> None: ...
 
+    def generate_video(
+        self,
+        out_video: Path,
+        *,
+        reference_image: Path | None,
+        audio: Path,
+        duration_s: float,
+        fps: int,
+    ) -> None: ...
+
 
 class StubBackend:
     """GPU-free stages built on ffmpeg. Produces real, playable artifacts."""
@@ -119,6 +129,61 @@ class StubBackend:
     def lipsync(self, animated: Path, speech: Path, out_lipsync: Path) -> None:
         # The stub has no mouth model; the lip-synced clip is the animated clip.
         shutil.copyfile(animated, out_lipsync)
+
+    def generate_video(
+        self,
+        out_video: Path,
+        *,
+        reference_image: Path | None,
+        audio: Path,
+        duration_s: float,
+        fps: int,
+    ) -> None:
+        # No diffusion model in the stub: loop the still half-body image and mux
+        # the synthesized audio, producing a real, playable MP4.
+        out_video.parent.mkdir(parents=True, exist_ok=True)
+        if reference_image is not None and Path(reference_image).exists():
+            run_ffmpeg(
+                [
+                    "-y",
+                    "-loop",
+                    "1",
+                    "-i",
+                    str(reference_image),
+                    "-i",
+                    str(audio),
+                    "-t",
+                    f"{duration_s:.3f}",
+                    "-r",
+                    str(fps),
+                    "-vf",
+                    "scale=512:512",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-shortest",
+                    str(out_video),
+                ]
+            )
+        else:
+            run_ffmpeg(
+                [
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    f"testsrc=duration={duration_s:.3f}:size=512x512:rate={fps}",
+                    "-i",
+                    str(audio),
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-shortest",
+                    str(out_video),
+                ]
+            )
 
 
 class RealBackend:
