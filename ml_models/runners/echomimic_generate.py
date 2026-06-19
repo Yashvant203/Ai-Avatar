@@ -25,6 +25,80 @@ import sys
 import tempfile
 import wave
 
+# Reference framing: EchoMimic squashes the reference to W×H and warps it toward a
+# fixed half-body pose skeleton. We frame the avatar head→waist and pad to square
+# so the face fills the canvas (identity) and lines up with the pose (no neck seam).
+_REF_SCALE = 5.0  # square side as a multiple of detected face height (head→waist)
+_REF_HEADROOM = 0.6  # space above the head, as a fraction of face height
+
+
+def _halfbody_crop_box(img_w, img_h, face_box, *, headroom_frac=_REF_HEADROOM, scale=_REF_SCALE):
+    """Square crop framing a person head-to-waist from a detected face box.
+
+    Returns (left, top, right, bottom); coords may fall outside [0, img] so the
+    caller pads (EchoMimic's pose template sits on a neutral canvas, so black
+    padding is fine). The box is always exactly square so the size resize keeps
+    facial proportions — squashing a non-square frame is what warped the jawline.
+    """
+    fx1, fy1, fx2, fy2 = face_box
+    fh = fy2 - fy1
+    cx = (fx1 + fx2) / 2.0
+    side = int(scale * fh)
+    top = int(fy1 - headroom_frac * fh)
+    left = int(cx - side / 2.0)
+    return (left, top, left + side, top + side)
+
+
+def _pad_square_box(img_w, img_h):
+    """Centered square covering the whole frame (fallback when no face is found).
+
+    Side = max dimension, so nothing is cropped out — the short axis is padded.
+    Preserves proportions without guessing where the person is.
+    """
+    side = max(img_w, img_h)
+    left = (img_w - side) // 2
+    top = (img_h - side) // 2
+    return (left, top, left + side, top + side)
+
+
+def _prepare_reference(ref_path, out_path, size):  # pragma: no cover - needs torch/PIL
+    """Crop the avatar reference to a person-centered, proportion-preserving square.
+
+    Handing EchoMimic a raw full-frame photo distorts the face (non-square squash)
+    and misaligns head/torso against the pose skeleton (the neck/collar seam).
+    Detect the face (MTCNN, already in envEM via facenet_pytorch), frame head→waist,
+    pad to square, then resize — so the face fills more of the 768 canvas and sits
+    where the pose template expects it.
+    """
+    from PIL import Image
+
+    img = Image.open(ref_path).convert("RGB")
+    W, H = img.size
+    box = None
+    try:
+        import torch
+        from facenet_pytorch import MTCNN
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        boxes, _ = MTCNN(keep_all=True, device=device).detect(img)
+        if boxes is not None and len(boxes):
+            biggest = max(boxes, key=lambda b: (b[2] - b[0]) * (b[3] - b[1]))
+            box = _halfbody_crop_box(W, H, tuple(float(v) for v in biggest))
+            print(f"[echomimic] face-framed reference crop {box} from {W}x{H}", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[echomimic] face detect failed ({exc}); padding full frame", flush=True)
+    if box is None:
+        box = _pad_square_box(W, H)
+        print(f"[echomimic] no face detected; padded square {box} from {W}x{H}", flush=True)
+
+    left, top, right, bottom = box
+    side = right - left
+    canvas = Image.new("RGB", (side, side), (0, 0, 0))
+    sx1, sy1 = max(0, left), max(0, top)
+    sx2, sy2 = min(W, right), min(H, bottom)
+    canvas.paste(img.crop((sx1, sy1, sx2, sy2)), (sx1 - left, sy1 - top))
+    canvas.resize((size, size), Image.LANCZOS).save(out_path)
+
 
 def _audio_seconds(path: str, fallback: float) -> float:
     try:
@@ -99,7 +173,9 @@ def main() -> None:
     # inputs one level deep under a "clip/" subdir to satisfy that.
     os.makedirs(os.path.join(ref_dir, "clip"), exist_ok=True)
     os.makedirs(os.path.join(aud_dir, "clip"), exist_ok=True)
-    shutil.copyfile(args.reference, os.path.join(ref_dir, "clip", "ref.png"))
+    # Frame the reference head→waist, square, before infer.py squashes it to W×H
+    # (raw full-frame photos cause identity drift + the neck/collar seam).
+    _prepare_reference(args.reference, os.path.join(ref_dir, "clip", "ref.png"), args.width)
     shutil.copyfile(args.audio, os.path.join(aud_dir, "clip", "aud.wav"))
     frames = _build_looped_pose(src_pose_dir, os.path.join(pose_root, "loop"), n_frames)
 
